@@ -1,12 +1,19 @@
 ---
 name: willform-forgejo
-description: Git operations with project's Forgejo instance - commit, branch, PR management
+description: Git operations with central Forgejo instance - commit, branch, PR management
 user-invocable: true
 ---
 
 # Willform Forgejo Integration
 
-Manage code in the project's Forgejo Git repository.
+Manage code in the project's organization on the **central Forgejo** instance.
+
+## Architecture
+
+- Central Forgejo runs in `willform-system` namespace
+- Each project has its own **organization** in Forgejo
+- Repository path: `{org}/{repo}` (set via FORGEJO_REPO_PATH)
+- Git credentials are pre-configured at startup
 
 ## Available Commands
 
@@ -36,6 +43,7 @@ When the user asks about code management, use these capabilities:
    - `notify`: Commit and notify user
    - `confirm`: Show diff and ask for approval
    - `manual`: Show detailed review before commit
+4. Push triggers Forgejo Actions for auto-build and deploy
 
 ## Best Practices
 
@@ -44,14 +52,4 @@ When committing code:
 - Group related changes in single commits
 - Create feature branches for major changes
 - Keep commits atomic and focused
-
-## Example Interactions
-
-User: "Create a login page"
-→ Generate code → Show preview → Get approval → Commit to Forgejo
-
-User: "Show me the current code"
-→ Fetch from Forgejo → Display to user
-
-User: "Create a branch for the new feature"
-→ Create branch in Forgejo → Switch context
+- Push with `git push -u origin main` to trigger build pipeline

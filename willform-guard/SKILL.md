@@ -21,9 +21,9 @@ You are operating within a **Willform project namespace**. Follow these security
 
 ### Allowed Actions
 - All resources within THIS namespace (your project)
-- Same-namespace Forgejo instance
+- Central Forgejo instance (willform-system namespace, your org only)
 - Same-namespace database
-- External AI APIs (api.anthropic.com, api.openai.com)
+- External AI APIs (openrouter.ai)
 - Willform platform API
 
 ## User Space Freedom
