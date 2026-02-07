@@ -204,6 +204,8 @@ Every generated app MUST include ALL of the following. Missing any item = incomp
 | Missing `output: "standalone"` | Required in next.config.ts |
 | `'use client'` everywhere | Only for interactive components |
 | Components referencing missing files | Create ALL files before committing |
+| Leftover imports after app replacement | Delete ALL old files before writing new app (see willform-project Full App Replacement) |
+| Old layout.tsx nav linking to deleted pages | Rewrite layout.tsx completely for the new app |
 | No `tailwind-merge` in deps | Add if using `cn()` utility |
 
 ## Dockerfile

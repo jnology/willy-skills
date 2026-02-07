@@ -68,7 +68,8 @@ Check Forgejo Actions to see if the build succeeded or failed:
 |---------|-------|-----|
 | `prisma generate` fails | confbox conflict with Next.js deps | Use isolated prisma-gen stage from DATABASE.md |
 | `COPY --from=builder /app/public` fails | public/ directory doesn't exist | Add `mkdir -p public` before `npm run build` in Dockerfile |
-| Module not found | Missing dependency | Add to package.json, run `npm install` |
+| Module not found (dependency) | Missing npm package | Add to package.json, run `npm install` |
+| Module not found (@/components/...) | Leftover import from old app | Delete the stale import or remove the file referencing old components. If replacing an app, follow Full App Cleanup in willform-forgejo |
 | TypeScript errors | Type errors in code | Fix the type errors in source files |
 | `node:22` fails | confbox/c12 incompatibility | Use `node:20-alpine` (NEVER node:22) |
 | OOM during build | Too many deps or large build | Simplify dependencies |

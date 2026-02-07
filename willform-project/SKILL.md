@@ -237,10 +237,85 @@ Before committing, check:
 - `prisma/schema.prisma` includes ALL models used in actions
 - `package.json` includes ALL npm packages used in code
 - `Dockerfile` exists and follows the DATABASE.md template exactly
+- No leftover imports from a previous app (if this is a replacement)
+- `layout.tsx` navigation links match current pages only
+- No orphaned component files from old app in `components/`
 
 ### Step 5: Commit & deliver
 
 Use the willform-forgejo skill to commit and push. Then follow the progress protocol from SOUL.md.
+
+## Full App Replacement
+
+When a user asks to build a COMPLETELY DIFFERENT app (e.g., "쇼핑몰 만들어줘" after already having a blog, or "블로그 만들어줘" after having a shopping mall):
+
+### How to Detect
+
+A full replacement is needed when:
+- User asks for a different app TYPE (shopping → blog, blog → todo, etc.)
+- User says "다시 만들어줘", "새로 만들어줘", "다른 거 만들어줘"
+- The requested app has fundamentally different data models and pages
+
+A full replacement is NOT needed when:
+- User asks to add a feature ("장바구니 추가해줘") → use Feature Addition
+- User asks to modify existing app ("디자인 바꿔줘") → use Feature Addition
+- User asks to fix something ("이거 안 돼") → fix the existing code
+
+### Cleanup Process (CRITICAL)
+
+Before writing any new code, you MUST delete ALL old app files. Leftover files from the old app will cause build failures (webpack module-not-found errors from stale imports).
+
+**Step 1: Delete old app files**
+
+Remove these directories and files completely:
+
+```bash
+# Delete old app code
+rm -rf app/
+rm -rf components/
+rm -f lib/actions.ts
+rm -f lib/utils.ts
+
+# Delete old schema (will be replaced)
+rm -f prisma/schema.prisma
+```
+
+**Step 2: Preserve platform files (NEVER delete these)**
+
+```
+.forgejo/workflows/    # Build workflow — managed by platform
+Dockerfile             # Will be rewritten, but don't delete before creating new one
+package.json           # Will be rewritten with new deps
+next.config.ts         # Usually stays the same
+tsconfig.json          # Usually stays the same
+tailwind.config.ts     # Usually stays the same
+lib/db.ts              # Prisma singleton — usually stays the same
+.gitignore
+.dockerignore
+```
+
+**Step 3: Build the new app from scratch**
+
+Follow the standard "Building Process" below, starting from Step 1 (Plan).
+
+**Step 4: Verify no leftovers**
+
+Before committing, verify:
+- `grep -r "from.*@/" app/ components/ lib/` — every import resolves to an existing file
+- No references to old models (e.g., Product in a blog app, Post in a shopping app)
+- No references to old components (e.g., CartProvider in a blog app)
+- `layout.tsx` navigation matches the NEW app's pages, not the old one's
+
+### Common Leftover Issues
+
+| Old App | New App | Typical Leftovers |
+|---------|---------|-------------------|
+| Shopping | Blog | CartProvider, AdminProductForm, product routes |
+| Blog | Shopping | PostCard, CategorySidebar, comment actions |
+| Todo | Any | TaskCard, priority/status enums |
+| Any | Any | Old `layout.tsx` navigation links, old admin pages |
+
+**The #1 rule: When replacing an app, start with a CLEAN workspace. Delete first, then build.**
 
 ## Feature Addition
 

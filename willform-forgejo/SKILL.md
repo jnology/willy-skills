@@ -51,6 +51,35 @@ git push -u origin main --force-with-lease
 
 The workspace may have diverged from remote (e.g., platform updated workflow files). `--force-with-lease` safely overwrites only if no unexpected remote changes exist. If it fails, pull first then retry.
 
+## Full App Cleanup (Before Replacement)
+
+When replacing an entire app (e.g., shopping mall → blog), clean the workspace BEFORE writing new code:
+
+```bash
+cd ~/workspace/app
+
+# 1. Delete old app directories
+rm -rf app/
+rm -rf components/
+rm -f lib/actions.ts
+rm -f lib/utils.ts
+rm -f prisma/schema.prisma
+
+# 2. NEVER delete these (platform-managed or reusable)
+# .forgejo/     — build workflow
+# lib/db.ts     — Prisma singleton (reusable)
+# Dockerfile    — will be rewritten
+# package.json  — will be rewritten
+# next.config.ts, tsconfig.json, tailwind.config.ts — usually unchanged
+# .gitignore, .dockerignore
+
+# 3. Stage deletions
+git add -A
+# Don't commit yet — write new code first, then commit everything together
+```
+
+**IMPORTANT**: Deletions and new code must be in the SAME commit. Never commit just deletions — that would leave the repo in a broken state.
+
 ## Pre-Commit Checklist
 
 Before committing, verify ALL of these:
