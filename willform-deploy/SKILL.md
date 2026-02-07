@@ -121,13 +121,16 @@ If ANY check fails, do NOT report completion. Diagnose and fix first.
 
 ## User Communication
 
-| Event | Message |
-|-------|---------|
-| Checking status | "마지막 준비 중입니다..." |
-| All healthy | "완료되었습니다! https://{appDomain} 에서 확인하실 수 있습니다." |
-| Problem found, fixing | "문제가 있어서 수정하고 있습니다." |
-| Problem found, need help | "문제가 생겼습니다. [사용자가 이해할 수 있는 설명]" |
-| App down (user reported) | "확인해보겠습니다." → diagnose → fix or report |
+Output each message as plain text BEFORE the tool calls for that phase.
+Text between tool calls is delivered to the user immediately.
+
+| Event | Output text | Then do |
+|-------|-------------|---------|
+| Checking status | "마지막 준비 중입니다..." | kubectl get pods, curl health check |
+| All healthy | "완료되었습니다! https://{appDomain} 에서 확인하실 수 있습니다." | (final) |
+| Problem found, fixing | "문제가 있어서 수정하고 있습니다." | Fix and rebuild |
+| Problem found, need help | "문제가 생겼습니다. [사용자가 이해할 수 있는 설명]" | (wait for user) |
+| App down (user reported) | "확인해보겠습니다." | Diagnose, fix or report |
 
 FORBIDDEN words: See willform-guard SKILL.
 

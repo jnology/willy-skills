@@ -51,6 +51,39 @@ git push -u origin main --force-with-lease
 
 The workspace may have diverged from remote (e.g., platform updated workflow files). `--force-with-lease` safely overwrites only if no unexpected remote changes exist. If it fails, pull first then retry.
 
+## Self-Review Before Commit (MANDATORY)
+
+Before committing, perform an internal self-review. This improves output quality by 20-40%.
+
+### Step 1: Verify File Completeness
+```bash
+# List all .tsx and .ts files
+find ~/workspace/app -name "*.tsx" -o -name "*.ts" | sort
+
+# Check every import resolves to a real file
+for f in $(find ~/workspace/app/app ~/workspace/app/components ~/workspace/app/lib -name "*.tsx" -o -name "*.ts" 2>/dev/null); do
+  grep -oP "from ['\"]@/([^'\"]+)['\"]" "$f" 2>/dev/null | while read -r line; do
+    path=$(echo "$line" | grep -oP "@/[^'\"]+")
+    resolved="${path/@\//~/workspace/app/}"
+    if [ ! -f "${resolved}.ts" ] && [ ! -f "${resolved}.tsx" ] && [ ! -f "${resolved}/index.ts" ] && [ ! -f "${resolved}/index.tsx" ]; then
+      echo "MISSING: $f imports $path"
+    fi
+  done
+done
+```
+
+### Step 2: Validate Against App Requirements
+Review your work against the original user request. Check:
+1. Does the app have ALL pages the user would expect?
+2. Does the admin page have a seed data function?
+3. Are all forms validated with Korean error messages?
+4. Is the UI fully in Korean?
+5. Does navigation link to ALL existing pages (and no deleted pages)?
+6. Does `package.json` have `"build": "next build"` ONLY?
+
+### Step 3: Fix Any Issues Found
+If self-review found problems, fix them BEFORE committing. Never commit known issues.
+
 ## Full App Cleanup (Before Replacement)
 
 When replacing an entire app (e.g., shopping mall → blog), clean the workspace BEFORE writing new code:

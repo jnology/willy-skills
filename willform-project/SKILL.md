@@ -15,16 +15,35 @@ Turn user conversations into complete, production-quality applications.
 - User gives a vague idea: "뭔가 파는 사이트", "회사 소개 페이지"
 - User wants to modify an existing app: "장바구니 추가해줘", "디자인 바꿔줘"
 
-## Core Principle: Build First, Iterate Later
+## Core Principle: Understand First, Build Right
 
-Users are non-developers. They cannot describe every feature they need. Your job is to:
+Users are non-developers. They know what they want but cannot describe technical details. Your job is to:
 
-1. **Interpret** — understand what they really want, not just what they said
-2. **Expand** — think of everything a complete version needs
-3. **Build** — create a working app with all essential features
-4. **Deliver** — give them a live URL, then refine based on feedback
+1. **Listen** — understand what they really want, not just what they said
+2. **Ask** — gather key details through 2-4 simple questions (non-technical, in user's language)
+3. **Confirm** — summarize what you'll build and get approval before starting
+4. **Build** — create a complete, working app based on gathered requirements
+5. **Deliver** — give them a live URL, then refine based on feedback
 
-Do NOT ask many questions upfront. Build a solid first version, then iterate.
+### What to Ask (2-4 questions, one message)
+
+The user is NOT a developer or tech expert. Ask like you're talking to a friend who's opening a shop.
+
+| Area | Good (non-expert friendly) | Bad (too technical) |
+|------|---------------------------|---------------------|
+| Content | "어떤 걸 파시나요? (예: 옷, 음식, 수제품)" | "상품 카테고리 구조를 알려주세요" |
+| Feature | "손님이 직접 주문할 수 있게 할까요?" | "주문 CRUD 기능이 필요하신가요?" |
+| Design | "어떤 느낌이 좋으세요? (밝고 따뜻한 느낌? 깔끔하고 심플한 느낌?)" | "컬러 팔레트를 지정해주세요" |
+| Scale | "처음에 몇 개 정도 올리실 거예요?" | "초기 데이터 시딩 수량을 알려주세요" |
+
+Use everyday language. Include concrete examples so the user can just pick one.
+Never use words like: 기능, 모듈, 시스템, 구현, 데이터, 카테고리 구조, UI/UX
+
+### When to Skip Questions and Build Immediately
+- Simple modifications: "장바구니 추가해줘" → just do it
+- Detailed requests with enough context already given → just build
+- User says "알아서 해줘" or "빨리 만들어줘" → use smart defaults from app type reference
+- Follow-up changes: "색상 바꿔줘" → just do it
 
 ## Completeness Thinking Framework
 
@@ -476,18 +495,49 @@ const products = [
 ];
 ```
 
+## Complexity Levels
+
+Match your implementation scope to the app's actual needs. Start at the right level — do not over-build.
+
+| Level | Type | Files | Features |
+|-------|------|-------|----------|
+| 1 | Static page (no DB) | layout + page + globals.css | Content display only |
+| 2 | Read-only list (DB read) | + prisma/schema + lib/db.ts + Dockerfile | Data listing, detail view |
+| 3 | CRUD app | + lib/actions.ts + forms + validation | Create, edit, delete, admin |
+| 4 | Multi-model app | + relations + cart/booking + search/filter | Full features, pagination, seed data |
+
+Most user requests ("쇼핑몰 만들어줘") are **Level 4**. Simple requests ("회사 소개 페이지") are **Level 1-2**.
+
 ## Building Process
 
-### Step 1: Plan (internal, not shown to user)
+### Step 1: Generate Objectives (internal, not shown to user)
 
-Work through the Completeness Thinking Framework above. List:
-- All pages with their purpose
-- All data models with fields
-- All user flows
+Before writing any code, generate a set of functional objectives. This "Chain of Grounded Objectives" approach produces better code with fewer tokens than step-by-step planning.
+
+Write objectives as a checklist in your thinking:
+```
+OBJECTIVES for [app type]:
+□ User can browse [items] with search, category filter, and pagination
+□ User can view [item] detail with all information
+□ User can [primary action] (e.g., add to cart, submit booking, create post)
+□ Admin can manage all [items] via CRUD interface
+□ Admin can generate seed data with 6-10 realistic Korean items
+□ Admin access is password-protected (cookie-based, default: admin1234)
+□ All UI text is in Korean with proper formatting (dates, currency)
+□ App is responsive (mobile, tablet, desktop)
+□ Every list page has search + filter + pagination
+□ Every form has validation with Korean error messages
+□ Empty states show friendly Korean messages
+□ Design uses one consistent accent color from the Color System
+```
+
+Then verify: Does EVERY objective map to at least one file you will create?
 
 ### Step 2: Tell the user you're starting
 
-Send a brief, friendly message:
+Output a brief, friendly message as plain text BEFORE any tool calls.
+Text output between tool calls is delivered to the user immediately.
+
 - "요청하신 쇼핑몰을 만들고 있습니다..."
 - "블로그를 만들기 시작했습니다..."
 
@@ -649,6 +699,32 @@ When a user asks to add a feature to an existing app:
 - Currency: Korean Won with comma separators (12,000원)
 - Empty states in Korean ("아직 등록된 상품이 없습니다")
 - Form validation messages in Korean ("이름을 입력해주세요")
+
+### Visual Design Quality
+
+Avoid generic "AI-generated" aesthetics. Every app should feel uniquely designed.
+
+Typography:
+- Use Pretendard or Noto Sans KR for Korean text (import via Google Fonts CDN link in layout.tsx)
+- Consistent font weights: 400 for body, 500 for labels, 600 for headings, 700 for hero text
+- Line height: 1.6 for body text, 1.2 for headings
+
+Color System:
+- Choose ONE accent color per app that matches its purpose:
+  - Shopping: warm orange or coral (#F97316 or #FB7185)
+  - Blog: deep blue or teal (#2563EB or #0D9488)
+  - Reservation: green or emerald (#059669 or #10B981)
+  - Portfolio: slate or violet (#475569 or #7C3AED)
+  - Todo: indigo or blue (#4F46E5 or #3B82F6)
+- Use Tailwind's color scale consistently (50 for bg, 100 for hover, 600 for text, 700 for accent)
+- Dark navigation bar with white text for professional look
+
+Layout Quality:
+- Hero sections: full-width with gradient overlay, min-h-[400px]
+- Card grids: consistent gap-6, hover:shadow-lg transition-shadow
+- Admin sidebar: sticky, full height, subtle border-r
+- Mobile: hamburger menu or stacked navigation
+- Consistent border-radius: rounded-2xl for cards, rounded-lg for buttons, rounded-full for avatars
 
 ## User Communication
 

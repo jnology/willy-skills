@@ -16,6 +16,19 @@ Build complete, production-quality apps on the Willform platform.
 - Setting up database models
 - Any code generation task
 
+## Success Criteria
+
+Every generated app must satisfy ALL of these before committing:
+
+1. All files compile without TypeScript errors
+2. Every `import` resolves to an existing file you created
+3. Every route in navigation links to an existing page
+4. Prisma schema includes all models referenced in code
+5. Server Actions return `{ error }` on all validation failures
+6. `package.json` has `"build": "next build"` only (no prisma commands)
+7. `next.config.ts` includes `output: "standalone"`
+8. All UI text is in Korean
+
 ## Default Tech Stack
 
 | Layer | Technology |
@@ -134,20 +147,7 @@ export default async function Page({ searchParams }: { searchParams: { q?: strin
 
 ### Client Component
 
-```tsx
-'use client'
-
-import { useState } from 'react'
-
-export function Counter() {
-  const [count, setCount] = useState(0)
-  return (
-    <button onClick={() => setCount(c => c + 1)} className="px-4 py-2 bg-gray-900 text-white rounded-lg">
-      {count}
-    </button>
-  )
-}
-```
+Add `'use client'` at the top. Use for interactive UI only (useState, onClick, useEffect). Keep Server Components as default for data fetching.
 
 ### Server Action (mutations)
 
@@ -189,17 +189,7 @@ model Item {
 
 ### Prisma Singleton (lib/db.ts)
 
-```typescript
-import { PrismaClient } from '@prisma/client'
-
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
-}
-
-export const prisma = globalForPrisma.prisma ?? new PrismaClient()
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
-```
+Use the standard global singleton pattern to prevent multiple PrismaClient instances in development. `lib/db.ts` already exists in the workspace — reuse it, do not recreate.
 
 ### Admin Password Protection
 
@@ -405,6 +395,43 @@ Every generated app MUST include ALL of the following. Missing any item = incomp
 DO NOT write your own Dockerfile. Copy the template from DATABASE.md exactly.
 It handles: isolated prisma stage, confbox conflict, standalone output, non-root user.
 
+## Visual Design Quality
+
+Avoid generic "AI-generated" look. Each app should feel intentionally designed.
+
+### Typography
+- Use `Pretendard` or `Noto Sans KR` via next/font/google
+- Headings: font-bold, text-2xl to text-4xl
+- Body: text-sm to text-base, text-gray-600
+- Price/numbers: font-semibold, tabular-nums
+
+### Color System (per app type)
+
+| App Type | Accent | Tailwind Class | Use For |
+|----------|--------|----------------|---------|
+| Shopping | Warm Orange | `orange-500` | CTA buttons, price highlights, cart badge |
+| Blog | Deep Blue | `blue-600` | Links, category tags, headers |
+| Reservation | Teal | `teal-500` | Available slots, confirm buttons |
+| Portfolio | Slate/Neutral | `slate-700` | Minimal, content-focused |
+| Task/Todo | Indigo | `indigo-500` | Priority indicators, action buttons |
+
+Apply ONE accent color consistently across the entire app. Never mix accent colors.
+
+### Layout Quality
+- Hero sections: full-width with gradient or image background
+- Card grids: `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6`
+- Admin: sidebar navigation with `w-64` fixed sidebar
+- Empty states: centered icon + message + action button
+- Loading: skeleton placeholders (not spinners)
+- Hover effects: `hover:shadow-lg transition-shadow` on cards
+
+### Anti-Patterns (Never Do)
+- Rainbow gradients or neon colors
+- Multiple conflicting accent colors
+- Default browser form styling (always style inputs)
+- Walls of unstyled text
+- Generic stock photo placeholders
+
 ## Response to User
 
 When code is complete:
@@ -458,16 +485,17 @@ Internal (for commits and logs only):
 
 ## Progress Reporting
 
-Report EACH phase separately. NEVER combine or skip phases.
+Each progress message MUST be output as plain text BEFORE the tool calls for that phase.
+Text output between tool calls is delivered to the user immediately via block streaming.
 
-| Phase | Message to User |
-|-------|-----------------|
-| Coding start | "요청하신 [앱이름]을 만들고 있습니다..." |
-| Feature added | "[기능명]을 추가하고 있습니다..." |
-| Code ready | "거의 다 됐습니다! 마무리 중이에요." |
-| Building | "준비 중입니다... (보통 2-3분 걸려요)" |
-| Almost done | "거의 완성됐습니다! 조금만 기다려주세요." |
-| Live | "완료되었습니다! [URL]에서 확인하실 수 있습니다." |
+| Phase | Output text first | Then do |
+|-------|-------------------|---------|
+| Coding start | "요청하신 [앱이름]을 만들고 있습니다..." | Write code files |
+| Feature added | "[기능명]을 추가하고 있습니다..." | Write feature files |
+| Code ready | "거의 다 됐습니다! 마무리 중이에요." | Git commit and push |
+| Building | "준비 중입니다... (보통 2-3분 걸려요)" | Check build status |
+| Almost done | "거의 완성됐습니다! 조금만 기다려주세요." | Check pod status |
+| Live | "완료되었습니다! [URL]에서 확인하실 수 있습니다." | (final message) |
 
 IMPORTANT: "거의 다 됐습니다" is NOT "완료". Build and deploy must complete first.
 

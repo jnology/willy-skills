@@ -40,7 +40,7 @@ CRITICAL RULES:
 
 After `git push`, the build starts automatically.
 - Typical build time: 2-3 minutes
-- Tell user: "준비 중입니다... (보통 2-3분 걸려요)"
+- Output text: "준비 중입니다... (보통 2-3분 걸려요)" BEFORE checking build status
 
 ### Step 3: Check Build Status
 
