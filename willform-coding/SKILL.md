@@ -246,6 +246,7 @@ Every generated app MUST include ALL of the following. Missing any item = incomp
 | Mistake | Solution |
 |---------|----------|
 | Synchronous `params` in dynamic routes | Next.js 15 requires `params: Promise<{...}>` with `await params` — see Dynamic Route pattern above |
+| `prisma db push` in package.json build | Build runs in isolated container without DB access. Use `"build": "next build"` only. prisma generate is in Dockerfile |
 | Missing prisma/schema.prisma | ALWAYS create schema BEFORE components |
 | Using Express/Vite | Use Next.js App Router — it's the only supported framework |
 | Single-stage Dockerfile | Use multi-stage from DATABASE.md |
