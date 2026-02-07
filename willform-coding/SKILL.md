@@ -84,6 +84,38 @@ export default async function ProductList() {
 }
 ```
 
+### Dynamic Route Page (Next.js 15 — CRITICAL)
+
+In Next.js 15, `params` is a **Promise** and MUST be awaited. Using synchronous params will cause a TypeScript build error: `Type '{ params: { id: string; }; }' does not satisfy the constraint 'PageProps'`.
+
+```tsx
+import { prisma } from '@/lib/db'
+import { notFound } from 'next/navigation'
+
+export const dynamic = 'force-dynamic'
+
+// CORRECT — params is a Promise in Next.js 15
+export default async function PostDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+
+  const post = await prisma.post.findUnique({ where: { id } })
+  if (!post) notFound()
+
+  return <div>{post.title}</div>
+}
+```
+
+**NEVER do this (will fail to build):**
+```tsx
+// WRONG — synchronous params causes TypeScript error in Next.js 15
+export default async function Page({ params }: { params: { id: string } }) {
+  const post = await prisma.post.findUnique({ where: { id: params.id } })
+```
+
 ### Client Component
 
 ```tsx
@@ -197,6 +229,7 @@ Every generated app MUST include ALL of the following. Missing any item = incomp
 
 | Mistake | Solution |
 |---------|----------|
+| Synchronous `params` in dynamic routes | Next.js 15 requires `params: Promise<{...}>` with `await params` — see Dynamic Route pattern above |
 | Missing prisma/schema.prisma | ALWAYS create schema BEFORE components |
 | Using Express/Vite | Use Next.js App Router — it's the only supported framework |
 | Single-stage Dockerfile | Use multi-stage from DATABASE.md |

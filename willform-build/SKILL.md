@@ -71,6 +71,7 @@ Check Forgejo Actions to see if the build succeeded or failed:
 | Module not found (dependency) | Missing npm package | Add to package.json, run `npm install` |
 | Module not found (@/components/...) | Leftover import from old app | Delete the stale import or remove the file referencing old components. If replacing an app, follow Full App Cleanup in willform-forgejo |
 | TypeScript errors | Type errors in code | Fix the type errors in source files |
+| `params` does not satisfy `PageProps` | Next.js 15 async params | Change `params: { id: string }` to `params: Promise<{ id: string }>` and add `const { id } = await params` |
 | `node:22` fails | confbox/c12 incompatibility | Use `node:20-alpine` (NEVER node:22) |
 | OOM during build | Too many deps or large build | Simplify dependencies |
 
