@@ -109,11 +109,27 @@ export default async function PostDetailPage({
 }
 ```
 
+Similarly, `searchParams` is also a Promise in Next.js 15:
+
+```tsx
+export default async function PostsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ category?: string }>
+}) {
+  const { category } = await searchParams
+  // use category...
+}
+```
+
 **NEVER do this (will fail to build):**
 ```tsx
 // WRONG — synchronous params causes TypeScript error in Next.js 15
 export default async function Page({ params }: { params: { id: string } }) {
   const post = await prisma.post.findUnique({ where: { id: params.id } })
+
+// WRONG — synchronous searchParams also causes TypeScript error
+export default async function Page({ searchParams }: { searchParams: { q?: string } }) {
 ```
 
 ### Client Component
