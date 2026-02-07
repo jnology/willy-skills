@@ -90,6 +90,7 @@ Before committing, verify ALL of these:
 4. **Dockerfile exists** — copy from DATABASE.md template, never write from scratch
 5. **next.config.ts has `output: "standalone"`**
 6. **.forgejo/workflows/ is untouched** — verify with `git diff --name-only | grep .forgejo` (should be empty)
+7. **Seed data action + admin button** — `lib/actions.ts` has `seedSampleData()` function and admin page has "샘플 데이터 생성" button
 
 ## Error Recovery
 

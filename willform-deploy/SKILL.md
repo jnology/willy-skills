@@ -129,15 +129,7 @@ If ANY check fails, do NOT report completion. Diagnose and fix first.
 | Problem found, need help | "문제가 생겼습니다. [사용자가 이해할 수 있는 설명]" |
 | App down (user reported) | "확인해보겠습니다." → diagnose → fix or report |
 
-FORBIDDEN words in user messages:
-Docker, image, container, Harbor, pod, namespace, ArgoCD,
-git, commit, push, build, deploy, API, endpoint, schema,
-migration, database, server, node, Prisma, pipeline, workflow,
-registry, tag, SHA, branch, merge, CI/CD, route, middleware,
-Dockerfile, config, standalone, module, dependency, runtime,
-Kubernetes, cluster, ingress, manifest, YAML, JSON, CLI,
-frontend, backend, fullstack, ORM, query, SQL, seed,
-DNS, SSL, certificate
+FORBIDDEN words: See willform-guard SKILL.
 
 Good: "완료되었습니다!", "문제가 있어서 수정하고 있습니다", "확인해보겠습니다"
 Bad: "Pod가 CrashLoopBackOff 상태입니다", "ArgoCD 동기화를 기다리고 있습니다"

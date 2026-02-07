@@ -201,6 +201,147 @@ export const prisma = globalForPrisma.prisma ?? new PrismaClient()
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 ```
 
+### Admin Password Protection
+
+Simple password-based admin access using cookies.
+
+```typescript
+// lib/auth.ts — checkPassword, setAdminCookie (httpOnly, 1 day), getAdminCookie
+import { cookies } from 'next/headers'
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin1234'
+export function checkPassword(pw: string) { return pw === ADMIN_PASSWORD }
+export async function setAdminCookie() {
+  (await cookies()).set('admin-auth', 'true', { httpOnly: true, maxAge: 86400 })
+}
+export async function getAdminCookie() {
+  return (await cookies()).get('admin-auth')?.value === 'true'
+}
+```
+
+```tsx
+// app/admin/layout.tsx — check cookie, show login or children
+import { getAdminCookie } from '@/lib/auth'
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  if (!(await getAdminCookie())) return <AdminLoginForm />
+  return <div>{children}</div>
+}
+```
+
+### Cart Context + localStorage
+
+`lib/cart-context.tsx` — `'use client'` component with `CartProvider` and `useCart` hook.
+
+Key structure:
+- `CartItem = { id, name, price, quantity }`
+- `useState<CartItem[]>` + two `useEffect`: load on mount (SSR-safe: check `typeof window`), sync on change
+- Functions: `addItem` (find existing → increment, else push qty 1), `removeItem`, `updateQuantity`, `clearCart`
+- `totalAmount` = `items.reduce((sum, i) => sum + i.price * i.quantity, 0)`
+- Wrap in root layout: `<CartProvider>{children}</CartProvider>`
+
+### Form Validation + Error Display
+
+Server Action returns `{ errors: Record<string, string> }`, client displays per field.
+
+```tsx
+// Server Action — validate, return { errors } or create + revalidatePath
+export async function createProduct(_prev: any, formData: FormData) {
+  const errors: Record<string, string> = {}
+  if (!formData.get('name')) errors.name = '상품명은 필수입니다'
+  if (Number(formData.get('price')) <= 0) errors.price = '가격은 0보다 커야 합니다'
+  if (Object.keys(errors).length > 0) return { errors }
+  // ... create + revalidatePath → return { errors: {} }
+}
+// Client: useActionState(createProduct, { errors: {} })
+// Display: {state.errors.name && <p className="text-red-500 text-sm">...</p>}
+```
+
+### Pagination (Server-Side)
+
+```tsx
+const PAGE_SIZE = 12
+export default async function Page({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+  const { page } = await searchParams
+  const currentPage = Math.max(1, Number(page) || 1)
+  const [items, total] = await Promise.all([
+    prisma.product.findMany({ skip: (currentPage - 1) * PAGE_SIZE, take: PAGE_SIZE, orderBy: { createdAt: 'desc' } }),
+    prisma.product.count(),
+  ])
+  const totalPages = Math.ceil(total / PAGE_SIZE)
+  // Render items + page navigation Links: <Link href={`?page=${i+1}`}>
+}
+```
+
+### Search + Category Filter
+
+`'use client'` component using `useSearchParams` + `router.push` to update URL params.
+
+```tsx
+// components/SearchFilter.tsx — 'use client'
+const update = (key: string, value: string) => {
+  const params = new URLSearchParams(searchParams.toString())
+  value ? params.set(key, value) : params.delete(key)
+  router.push(`?${params.toString()}`)
+}
+// Render: input for search (onChange → update('q', ...)), select for category filter
+```
+
+IMPORTANT: Wrap in `<Suspense>` when used: `<Suspense fallback={null}><SearchFilter /></Suspense>`
+Server page reads `searchParams` to filter: `prisma.product.findMany({ where: { name: { contains: q } } })`
+
+### Prisma Relations
+
+1:N with cascade delete, include queries, nested create.
+
+```prisma
+model Category {
+  id String @id @default(cuid()); name String; products Product[]
+}
+model Product {
+  id String @id @default(cuid()); name String; price Int
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId String
+}
+```
+
+```typescript
+const products = await prisma.product.findMany({ include: { category: true } })
+await prisma.category.create({
+  data: { name: '전자제품', products: { create: [{ name: '노트북', price: 1500000 }] } },
+})
+```
+
+### Seed Data Server Action
+
+Idempotent: check count first, use `createMany`, `revalidatePath` after.
+
+```typescript
+export async function seedSampleData() {
+  if ((await prisma.product.count()) > 0) return { error: '이미 데이터가 있습니다' }
+  await prisma.product.createMany({ data: [
+    { name: '샘플 1', price: 10000, imageUrl: 'https://picsum.photos/seed/p1/400/300' },
+    { name: '샘플 2', price: 20000, imageUrl: 'https://picsum.photos/seed/p2/400/300' },
+  ]})
+  revalidatePath('/'); return { success: true }
+}
+```
+
+Admin button: `<button onClick={() => seedSampleData()}>샘플 데이터 추가</button>`
+
+### Admin Layout
+
+`app/admin/layout.tsx` — sidebar nav with `Link` components, `bg-gray-50` background.
+
+```tsx
+const NAV = [{ href: '/admin', label: '대시보드' }, { href: '/admin/products', label: '상품 관리' }]
+// Layout: flex container, left nav (w-56, bg-white, border-r), right main (flex-1, p-8)
+// Map NAV → <Link> with hover:bg-gray-100 styling
+```
+
+### Image URL Field
+
+Schema: `imageUrl String?`. Display: `<img>` if exists, else fallback `<div>` with first letter + `bg-gray-200`.
+Admin form: `<input type="url" name="imageUrl" placeholder="https://..." defaultValue={product?.imageUrl || ''} />`
+
 ## App Completeness Checklist
 
 Every generated app MUST include ALL of the following. Missing any item = incomplete app.
@@ -257,6 +398,7 @@ Every generated app MUST include ALL of the following. Missing any item = incomp
 | Leftover imports after app replacement | Delete ALL old files before writing new app (see willform-project Full App Replacement) |
 | Old layout.tsx nav linking to deleted pages | Rewrite layout.tsx completely for the new app |
 | No `tailwind-merge` in deps | Add if using `cn()` utility |
+| `"build": "prisma db push && next build"` in package.json | DB not available during build. Use `"build": "next build"` only |
 
 ## Dockerfile
 
@@ -271,15 +413,7 @@ When code is complete:
 3. After deployment: provide the app URL
 4. Never show code, file paths, or technical details to user
 
-FORBIDDEN words in user messages:
-Docker, image, container, Harbor, pod, namespace, ArgoCD,
-git, commit, push, build, deploy, API, endpoint, schema,
-migration, database, server, node, Prisma, pipeline, workflow,
-registry, tag, SHA, branch, merge, CI/CD, route, middleware,
-Dockerfile, config, standalone, module, dependency, runtime,
-Kubernetes, cluster, ingress, manifest, YAML, JSON, CLI,
-frontend, backend, fullstack, ORM, query, SQL, seed,
-DNS, SSL, certificate
+FORBIDDEN words: See willform-guard SKILL.
 
 Good user messages:
 - "요청하신 쇼핑몰을 만들고 있습니다..."

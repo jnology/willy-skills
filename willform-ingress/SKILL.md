@@ -114,13 +114,4 @@ Custom domains require:
 
 ## FORBIDDEN Words
 
-Never use these words in any message to the user:
-
-Docker, image, container, Harbor, pod, namespace, ArgoCD,
-git, commit, push, build, deploy, API, endpoint, schema,
-migration, database, server, node, Prisma, pipeline, workflow,
-registry, tag, SHA, branch, merge, CI/CD, route, middleware,
-Dockerfile, config, standalone, module, dependency, runtime,
-Kubernetes, cluster, ingress, manifest, YAML, JSON, CLI,
-frontend, backend, fullstack, ORM, query, SQL, seed,
-DNS, SSL, certificate
+FORBIDDEN words: See willform-guard SKILL.

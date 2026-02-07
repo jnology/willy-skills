@@ -75,6 +75,8 @@ Check Forgejo Actions to see if the build succeeded or failed:
 | `searchParams` does not satisfy `PageProps` | Next.js 15 async searchParams | Change `searchParams: { q?: string }` to `searchParams: Promise<{ q?: string }>` and add `const { q } = await searchParams` |
 | `Can't reach database server` at build | `prisma db push` in package.json build script | Remove `prisma db push` from build script. Use `"build": "next build"` only. DB migrations are handled by CI |
 | `node:22` fails | confbox/c12 incompatibility | Use `node:20-alpine` (NEVER node:22) |
+| `"build": "prisma db push && next build"` | prisma db push needs DB at build time | Use `"build": "next build"` only. prisma generate is in Dockerfile |
+| Missing `tailwind-merge` or `clsx` | `cn()` utility requires these packages | Add `tailwind-merge` and `clsx` to package.json dependencies |
 | OOM during build | Too many deps or large build | Simplify dependencies |
 
 ## Dockerfile
@@ -118,15 +120,7 @@ If you suspect the workflow is broken:
 | Failure (retrying) | "문제가 있어서 다시 시도하고 있습니다." |
 | Failure (giving up) | "문제가 생겼습니다. [사용자가 이해할 수 있는 설명]" |
 
-FORBIDDEN words in user messages:
-Docker, image, container, Harbor, pod, namespace, ArgoCD,
-git, commit, push, build, deploy, API, endpoint, schema,
-migration, database, server, node, Prisma, pipeline, workflow,
-registry, tag, SHA, branch, merge, CI/CD, route, middleware,
-Dockerfile, config, standalone, module, dependency, runtime,
-Kubernetes, cluster, ingress, manifest, YAML, JSON, CLI,
-frontend, backend, fullstack, ORM, query, SQL, seed,
-DNS, SSL, certificate
+FORBIDDEN words: See willform-guard SKILL.
 
 Good: "준비 중입니다", "문제가 있었지만 해결했습니다"
 Bad: "Docker 이미지를 빌드하고 Harbor에 푸시 중입니다"
