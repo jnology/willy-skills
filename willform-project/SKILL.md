@@ -97,56 +97,42 @@ Every app needs admin protection. In v1, use simple password-based admin access 
 
 **How it works:**
 
-1. Admin visits `/admin` → sees password input form
-2. Enters password → server action validates → sets HTTP-only cookie
-3. All `/admin/*` pages check cookie via `checkAdminAuth()`
-4. Wrong password or no cookie → redirect to `/admin/login`
+1. Admin visits `/admin` → layout checks cookie via `getAdminCookie()`
+2. No cookie → layout renders inline `<AdminLoginForm />` instead of children
+3. User enters password → server action validates → sets HTTP-only cookie → page reloads
+4. Cookie valid → layout renders children (admin pages)
+
+**NEVER do these (causes redirect loop):**
+- `redirect('/admin/login')` from admin layout — login page is INSIDE admin layout, creating infinite redirect
+- Create `middleware.ts` that redirects `/admin/*` — same redirect loop issue
+- Create a separate `/admin/login` page — use inline form in layout instead
 
 **Implementation:**
 
 ```typescript
-// lib/auth.ts
-import { cookies } from "next/headers";
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin1234";
-const COOKIE_NAME = "admin_session";
-const COOKIE_VALUE = "authenticated"; // simple static token for v1
-
-export async function checkAdminPassword(password: string): Promise<boolean> {
-  return password === ADMIN_PASSWORD;
-}
-
+// lib/auth.ts — checkPassword, setAdminCookie (httpOnly, 1 day), getAdminCookie
+import { cookies } from 'next/headers'
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin1234'
+export function checkPassword(pw: string) { return pw === ADMIN_PASSWORD }
 export async function setAdminCookie() {
-  const cookieStore = await cookies();
-  cookieStore.set(COOKIE_NAME, COOKIE_VALUE, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24, // 24 hours
-    path: "/",
-  });
+  (await cookies()).set('admin-auth', 'true', { httpOnly: true, maxAge: 86400 })
 }
-
-export async function checkAdminAuth(): Promise<boolean> {
-  const cookieStore = await cookies();
-  return cookieStore.get(COOKIE_NAME)?.value === COOKIE_VALUE;
-}
-
-export async function clearAdminCookie() {
-  const cookieStore = await cookies();
-  cookieStore.delete(COOKIE_NAME);
+export async function getAdminCookie() {
+  return (await cookies()).get('admin-auth')?.value === 'true'
 }
 ```
 
-**Admin login page (`app/admin/login/page.tsx`):**
-- Simple centered form: password input + submit button
-- Server action calls `checkAdminPassword()` → `setAdminCookie()` → redirect to `/admin`
-- Show error message on wrong password
+**Admin layout (`app/admin/layout.tsx`) — inline login, NO redirect:**
 
-**Admin layout (`app/admin/layout.tsx`):**
-- Check `checkAdminAuth()` at the top
-- If not authenticated and path is not `/admin/login`, redirect to `/admin/login`
-- Include admin navigation and logout button
+```tsx
+import { getAdminCookie } from '@/lib/auth'
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  if (!(await getAdminCookie())) return <AdminLoginForm />
+  return <div>{/* admin sidebar nav + children */}</div>
+}
+```
+
+The layout renders a login form INLINE when not authenticated. No separate login page, no redirect.
 
 **Default password:** `admin1234` (set via `ADMIN_PASSWORD` env var)
 Include this in seed data instructions to the user: "관리자 비밀번호는 admin1234 입니다."
@@ -177,7 +163,6 @@ Pages:
 - `/cart` — Cart: item list with quantity controls, total calculation, checkout button
 - `/checkout` — Checkout: order form (name, phone, address, delivery notes), order summary
 - `/orders/[id]` — Order confirmation: order number, status, item summary
-- `/admin/login` — Admin login (password)
 - `/admin` — Admin dashboard: order count today, total revenue, low stock alerts
 - `/admin/products` — Product CRUD: list with search, add/edit/delete
 - `/admin/products/new` — Product form: name, price, description, imageUrl, category, stock
@@ -219,7 +204,6 @@ Pages:
 - `/` — Home: latest posts (6), featured post highlight, category list sidebar
 - `/posts` — Post list: all posts with category filter tabs, search bar, pagination
 - `/posts/[slug]` — Post detail: title, content, author, date, reading time, category badge, comments section
-- `/admin/login` — Admin login (password)
 - `/admin` — Admin dashboard: total posts, published vs draft count, recent comments
 - `/admin/posts` — Post management: list with status filter (all/published/draft), search
 - `/admin/posts/new` — Post editor: title, slug (auto-generated), content (textarea), excerpt, category, featured toggle, publish/draft toggle
@@ -260,7 +244,6 @@ Pages:
 - `/services` — Service list: cards with name, duration, price, "예약하기" button
 - `/booking` — Booking form: service selector, date picker, available time slot selector, customer info (name, phone, email, notes)
 - `/booking/complete` — Booking confirmation: reference number, summary, "another booking" link
-- `/admin/login` — Admin login (password)
 - `/admin` — Admin dashboard: today's bookings, upcoming bookings count, status breakdown
 - `/admin/bookings` — Booking management: list with date filter, status filter, status update buttons (confirm/cancel)
 - `/admin/bookings/[id]` — Booking detail: full info, status change, notes
@@ -299,7 +282,6 @@ Pages:
 - `/projects` — Project grid: filterable by category, responsive masonry-style grid
 - `/projects/[id]` — Project detail: title, description, imageUrl, category, date, client info
 - `/contact` — Contact form: name, email, message, submit confirmation
-- `/admin/login` — Admin login (password)
 - `/admin` — Admin dashboard: project count, unread messages count, recent messages
 - `/admin/projects` — Project CRUD: list, add/edit/delete with drag-to-reorder (or displayOrder field)
 - `/admin/projects/new` — Project form: title, description, imageUrl, category, featured toggle, displayOrder
@@ -338,7 +320,6 @@ Pages:
 - `/tasks/new` — Create task form: title, description, category, priority, due date
 - `/tasks/[id]` — Task detail: full info, status change buttons, edit link, delete button
 - `/tasks/[id]/edit` — Edit task form
-- `/admin/login` — Admin login (password)
 - `/admin` — Admin dashboard: statistics charts (status distribution, overdue trend)
 - `/admin/categories` — Category CRUD: name, color (hex code)
 - `/admin/seed` — Seed data page: "샘플 데이터 생성" button
@@ -373,18 +354,17 @@ SKIP in v1:
 
 When a user requests an app that doesn't match the 5 types above (e.g., "레시피 앱", "재고 관리", "회원 관리", "설문조사"), use this universal framework.
 
-**Every app, regardless of type, MUST include these 10 items:**
+**Every app, regardless of type, MUST include these 9 items:**
 
 1. **Main list page** (`/`) — shows all primary items with search + filter + pagination
 2. **Detail page** (`/items/[id]`) — shows full info for one item
-3. **Admin login** (`/admin/login`) — password-protected admin area
-4. **Admin dashboard** (`/admin`) — key statistics and recent activity
-5. **Admin CRUD** (`/admin/items`) — create, read, update, delete primary items
-6. **Seed data button** (`/admin/seed`) — "샘플 데이터 생성" button that creates 6-10 realistic Korean items
-7. **Password protection** — `lib/auth.ts` with cookie-based admin auth
-8. **Responsive design** — works on mobile, tablet, desktop
-9. **Korean UI** — all text in Korean, Korean date/currency formatting
-10. **Empty states** — friendly Korean messages when no data exists
+3. **Admin dashboard** (`/admin`) — password-protected admin area with key statistics and recent activity
+4. **Admin CRUD** (`/admin/items`) — create, read, update, delete primary items
+5. **Seed data button** (`/admin/seed`) — "샘플 데이터 생성" button that creates 6-10 realistic Korean items
+6. **Password protection** — `lib/auth.ts` with cookie-based admin auth (inline login form in layout, NO separate login page)
+7. **Responsive design** — works on mobile, tablet, desktop
+8. **Korean UI** — all text in Korean, Korean date/currency formatting
+9. **Empty states** — friendly Korean messages when no data exists
 
 **Planning process for unknown app types:**
 
@@ -392,7 +372,7 @@ When a user requests an app that doesn't match the 5 types above (e.g., "레시�
 2. Identify SUPPORTING entities (categories, tags, statuses?)
 3. Determine the VISITOR flow (browse → view detail → take action?)
 4. Determine the ADMIN flow (add items → manage → track?)
-5. Map to pages using the 10 mandatory items above
+5. Map to pages using the 9 mandatory items above
 6. Add app-specific features based on user description
 
 ## Seed Data
@@ -555,16 +535,15 @@ Build order:
 7. `app/globals.css` — Tailwind imports
 8. `app/page.tsx` — home page
 9. All feature pages (e.g., `app/products/page.tsx`, `app/products/[id]/page.tsx`)
-10. Admin login page (`app/admin/login/page.tsx`)
-11. Admin layout (`app/admin/layout.tsx`) — with auth check
-12. All admin pages (e.g., `app/admin/page.tsx`, `app/admin/products/page.tsx`)
-13. Admin seed page (`app/admin/seed/page.tsx`)
-14. Shared components (e.g., `components/ProductCard.tsx`)
-15. `package.json` — with all dependencies
-16. `next.config.ts` — with `output: "standalone"`
-17. `Dockerfile` — copy from DATABASE.md template (NEVER write your own)
-18. `tsconfig.json`
-19. `tailwind.config.ts`
+10. Admin layout (`app/admin/layout.tsx`) — with inline login form + auth check (NO separate login page)
+11. All admin pages (e.g., `app/admin/page.tsx`, `app/admin/products/page.tsx`)
+12. Admin seed page (`app/admin/seed/page.tsx`)
+13. Shared components (e.g., `components/ProductCard.tsx`)
+14. `package.json` — with all dependencies
+15. `next.config.ts` — with `output: "standalone"`
+16. `Dockerfile` — copy from DATABASE.md template (NEVER write your own)
+17. `tsconfig.json`
+18. `tailwind.config.ts`
 
 ### Step 4: Verify completeness
 
@@ -577,7 +556,8 @@ Before committing, check:
 - No leftover imports from a previous app (if this is a replacement)
 - `layout.tsx` navigation links match current pages only
 - No orphaned component files from old app in `components/`
-- `lib/auth.ts` exists with admin password functions
+- `lib/auth.ts` exists with admin password functions (`checkPassword`, `setAdminCookie`, `getAdminCookie`)
+- `app/admin/layout.tsx` uses inline login form (NO redirect to `/admin/login`, NO `middleware.ts`)
 
 **package.json rules:**
 - `"build"` script MUST be `"next build"` ONLY — NO prisma commands in build script

@@ -217,6 +217,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 }
 ```
 
+**NEVER do these (causes redirect loop):**
+- `redirect('/admin/login')` from admin layout — login page is INSIDE admin layout, creating infinite redirect
+- Create `middleware.ts` that redirects `/admin/*` — same redirect loop issue
+- Create a separate `/admin/login` page — use inline form in layout instead
+
 ### Cart Context + localStorage
 
 `lib/cart-context.tsx` — `'use client'` component with `CartProvider` and `useCart` hook.
@@ -387,6 +392,8 @@ Every generated app MUST include ALL of the following. Missing any item = incomp
 | Components referencing missing files | Create ALL files before committing |
 | Leftover imports after app replacement | Delete ALL old files before writing new app (see willform-project Full App Replacement) |
 | Old layout.tsx nav linking to deleted pages | Rewrite layout.tsx completely for the new app |
+| Admin redirect loop | `/admin/login` inside admin layout causes infinite redirect | Use inline `<AdminLoginForm />` in layout, no separate login page |
+| middleware.ts for admin auth | Middleware + layout both redirect = loop | No middleware.ts — use layout auth only |
 | No `tailwind-merge` in deps | Add if using `cn()` utility |
 | `"build": "prisma db push && next build"` in package.json | DB not available during build. Use `"build": "next build"` only |
 
