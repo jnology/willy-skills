@@ -189,7 +189,13 @@ MUST-HAVE for v1:
 - Order status workflow: pending → confirmed → shipped → delivered (with cancelled option)
 - Admin dashboard with today's stats
 - Category CRUD with display order
-- Seed data: 3 categories, 8-10 products with Korean names and picsum images
+- Seed data: 3 categories, 8-10 products with Korean names and picsum images, 2-3 sentence descriptions each, varied price ranges (5,000원~150,000원)
+
+Layout guidelines:
+- Home: hero banner, then featured products grid (3-col)
+- Product list: 3-column grid with search/filter sidebar or top bar
+- Product detail: 2-column layout (image left, info right on desktop)
+- Cart: table-style list with quantity controls, sticky order summary on desktop
 
 SKIP in v1:
 - Payment gateway integration
@@ -228,7 +234,14 @@ MUST-HAVE for v1:
 - Comment count display on post list cards
 - Formatted dates in Korean ("2024년 1월 15일")
 - Admin dashboard with post/comment statistics
-- Seed data: 3 categories, 6-8 posts with realistic Korean content, 2-3 comments per post
+- Seed data: 3 categories, 6-8 posts with realistic Korean content (3-5 paragraphs, 150-300 words each), 2-3 comments per post
+
+Layout guidelines:
+- Home: featured post as full-width card with large image, then 2-column grid of recent posts
+- Post list: single column, `max-w-3xl`, each card shows image, title, excerpt (2 lines), category badge, date, reading time
+- Post detail: `max-w-3xl mx-auto`, `text-lg leading-relaxed`, paragraph spacing `space-y-4`, `whitespace-pre-line` for content
+- Comment form: below post content, simple card with name input + textarea + submit
+- Category tabs: horizontal pill buttons at top (see willform-coding Category Tabs Pattern)
 
 SKIP in v1:
 - Rich text editor (use plain textarea, render with line breaks)
@@ -265,7 +278,12 @@ MUST-HAVE for v1:
 - Service active/inactive toggle
 - Booking reference number (formatted: `BK-{YYMMDD}-{count}`)
 - Admin dashboard with today's schedule
-- Seed data: 3-4 services, 5-6 time slots, 6-8 bookings across different dates
+- Seed data: 3-4 services, 5-6 time slots, 6-8 bookings spread across next 7 days
+
+Layout guidelines:
+- Home: hero with business info, services grid below
+- Booking: step-by-step flow (service → date → time slot grid → customer info)
+- Time slot grid: buttons in 2-3 column grid, disabled for fully-booked slots
 
 SKIP in v1:
 - Calendar widget (use simple date input + time slot buttons)
@@ -411,6 +429,10 @@ export async function seedData() {
    - Each item gets a unique seed key: `https://picsum.photos/seed/product-1/400/300`
    - Use consistent aspect ratios (400x300 for cards, 800x600 for detail pages)
 5. **Varied data** — include items across all categories, different statuses, different price ranges
+6. **Content depth by app type**:
+   - Blog: 3-5 paragraphs per post (150-300 words), varied topics within category
+   - Shopping: 2-3 sentence product descriptions, price ranges from budget to premium
+   - Reservation: bookings spread across next 7 days with varied time slots
 6. **Include relationships** — if products have categories, create categories first and assign products to them
 
 ### Seed Data in Admin Navigation
@@ -559,6 +581,17 @@ Before committing, check:
 - `lib/auth.ts` exists with admin password functions (`checkPassword`, `setAdminCookie`, `getAdminCookie`)
 - `app/admin/layout.tsx` uses inline login form (NO redirect to `/admin/login`, NO `middleware.ts`)
 
+**Design Quality Review (ALL must be YES):**
+- Hero presence — home page has a visual hero section (gradient, not just plain heading)?
+- Card consistency — all list items use Card Pattern with `rounded-2xl` and `hover:shadow-lg`?
+- Navigation quality — sticky nav with `backdrop-blur-md`?
+- Whitespace — sections separated by `py-16`, cards have `gap-6`?
+- Typography — `Noto_Sans_KR` imported via `next/font/google`?
+- Color discipline — one accent color used consistently (see Color System table)?
+- Interactive feedback — all buttons have `hover:` state and `transition-colors`?
+
+ANY answer is NO → fix before committing.
+
 **package.json rules:**
 - `"build"` script MUST be `"next build"` ONLY — NO prisma commands in build script
   - Correct: `"build": "next build"`
@@ -570,9 +603,37 @@ Before committing, check:
   - `tailwindcss`, `@tailwindcss/postcss`, `postcss`
 - Do NOT include packages that aren't imported in any file
 
-### Step 5: Commit & deliver
+### Step 5: Commit & push
 
-Use the willform-forgejo skill to commit and push. Then follow the progress protocol from SOUL.md.
+Use the willform-forgejo skill to commit and push.
+Output: "준비 중입니다... (보통 2-3분 걸려요)"
+
+### Step 6: Wait for build (MANDATORY — never skip)
+
+After git push, you MUST wait for the build to complete. DO NOT claim the app is complete or provide the URL.
+
+1. Check Forgejo Actions build status
+2. If still running: wait 30 seconds, check again (repeat up to 10 times)
+3. If build FAILED: output the retry message and fix the issue
+4. If build succeeded: proceed to Step 7
+
+*** Claiming completion before build succeeds is the WORST user experience. The user clicks the URL and sees nothing. ***
+
+### Step 7: Verify deployment (MANDATORY — never skip)
+
+After build succeeds, verify the app is actually running and accessible:
+
+1. Check pods: `/data/bin/kubectl get pods -n {userNamespace}` — must show Running, 1/1 Ready, 0 restarts
+2. Health check: `curl -sf https://{appDomain} --max-time 10` — must return HTTP 200
+3. If pods are not Running or curl fails: wait 15s and retry (up to 3 times)
+4. If still failing: output "문제가 생겼습니다. 확인하고 있습니다." and diagnose
+
+### Step 8: Report completion
+
+ONLY after ALL checks pass (build success + pods Running + HTTP 200):
+- Output: "완료되었습니다! {URL}에서 확인하실 수 있습니다."
+- Then: "관리자 페이지는 {URL}/admin 에서 접속하실 수 있어요. 비밀번호는 admin1234 입니다."
+- Then ask: "어떠세요? 수정하거나 추가하고 싶은 부분이 있으면 말씀해주세요."
 
 ## Full App Replacement
 
@@ -661,50 +722,9 @@ When a user asks to add a feature to an existing app:
 
 ## Design Principles
 
-### Visual Consistency
-- Use a consistent color palette (grays + one accent color)
-- Rounded corners (`rounded-xl` for cards, `rounded-lg` for buttons)
-- Consistent spacing (`p-4`, `p-6`, `gap-4`, `gap-6`)
-- Clean typography (font-semibold for headings, text-gray-500 for secondary text)
-
-### Mobile First
-- Single column on mobile, multi-column on desktop
-- Use Tailwind breakpoints: `sm:`, `md:`, `lg:`
-- Touch-friendly button sizes (min `py-2 px-4`)
-- Navigation that works on small screens (collapsible menu or simple stack)
-
-### Korean UI
-- All labels, buttons, and messages in Korean
-- Date format: Korean style (2024년 1월 15일)
-- Currency: Korean Won with comma separators (12,000원)
-- Empty states in Korean ("아직 등록된 상품이 없습니다")
-- Form validation messages in Korean ("이름을 입력해주세요")
-
-### Visual Design Quality
-
-Avoid generic "AI-generated" aesthetics. Every app should feel uniquely designed.
-
-Typography:
-- Use Pretendard or Noto Sans KR for Korean text (import via Google Fonts CDN link in layout.tsx)
-- Consistent font weights: 400 for body, 500 for labels, 600 for headings, 700 for hero text
-- Line height: 1.6 for body text, 1.2 for headings
-
-Color System:
-- Choose ONE accent color per app that matches its purpose:
-  - Shopping: warm orange or coral (#F97316 or #FB7185)
-  - Blog: deep blue or teal (#2563EB or #0D9488)
-  - Reservation: green or emerald (#059669 or #10B981)
-  - Portfolio: slate or violet (#475569 or #7C3AED)
-  - Todo: indigo or blue (#4F46E5 or #3B82F6)
-- Use Tailwind's color scale consistently (50 for bg, 100 for hover, 600 for text, 700 for accent)
-- Dark navigation bar with white text for professional look
-
-Layout Quality:
-- Hero sections: full-width with gradient overlay, min-h-[400px]
-- Card grids: consistent gap-6, hover:shadow-lg transition-shadow
-- Admin sidebar: sticky, full height, subtle border-r
-- Mobile: hamburger menu or stacked navigation
-- Consistent border-radius: rounded-2xl for cards, rounded-lg for buttons, rounded-full for avatars
+Follow the Visual Design System defined in willform-coding skill.
+Key rules: ONE accent color per app, `bg-gray-50` body, Noto Sans KR font, responsive grid layout.
+Korean UI throughout: dates (2024년 1월 15일), currency (12,000원), all labels/messages in Korean.
 
 ## User Communication
 
