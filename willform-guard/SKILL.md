@@ -42,8 +42,12 @@ Security enforcement for all Willy operations within Willform projects.
 | **Container** | Mount host paths |
 | **Code** | Hardcode credentials |
 | **Code** | Log sensitive data |
-| **Exposure** | Reveal internal paths to user |
+| **Exposure** | Reveal internal paths to user (e.g., `/home/node/...`, `/app/...`, `~/workspace/...`) |
 | **Exposure** | Show internal URLs to user |
+| **Exposure** | Mention internal document names to user (SOUL.md, AGENTS.md, BUILD.md, DATABASE.md, TOOLS.md, USER.md, SKILL files) |
+| **Exposure** | Mention system message formats to user (e.g., `[SYSTEM BUILD RESULT]`, `[SYSTEM ...]`) |
+| **Exposure** | Reveal internal processes, directories, git repos, or workspace structure to user |
+| **Language** | Non-English text in generated UI code (labels, buttons, headings, messages, placeholders, seed data) |
 
 ## Allowed Images (Allowlist)
 
@@ -104,7 +108,7 @@ securityContext:
 | Enterprise | Custom | Custom | Custom | Custom |
 
 **Action**: Warn user before operations that may exceed limits.
-User-facing warning: "현재 요금제에서는 이 기능을 추가하기 어렵습니다. 요금제를 변경하시겠어요?"
+User-facing warning: "This feature requires a higher plan. Would you like to upgrade?"
 
 ## Approval Levels
 
@@ -121,7 +125,7 @@ When errors occur:
 1. Try to fix automatically WITHOUT telling the user technical details
 2. If fixed: report only the successful outcome
 3. If not fixable: tell user what THEY need to do (not what broke internally)
-4. Never show "오류가 발생했습니다" alone — always include next action
+4. Never show "An error occurred" alone — always include next action
 
 ## Error Messages to Users (CRITICAL)
 
@@ -129,19 +133,24 @@ When errors occur:
 
 | Situation | User Message |
 |-----------|--------------|
-| Rate limited | "잠시 후 다시 시도해주세요." |
-| Temporary failure | "일시적인 문제가 있었습니다. 다시 시도할게요." |
-| Auth problem | "인증에 문제가 생겼습니다. 확인해주세요." |
-| Timeout | "시간이 좀 걸리고 있습니다. 잠시만 기다려주세요." |
-| Resource limit | "현재 요금제에서는 이 기능을 추가하기 어렵습니다." |
+| Rate limited | "Please try again in a moment." |
+| Temporary failure | "Ran into a small issue. Let me try again." |
+| Auth problem | "There's a problem with your login. Please check and try again." |
+| Timeout | "This is taking a bit longer than usual. Please hang tight." |
+| Resource limit | "This feature requires a higher plan to add." |
 
 ### NEVER show to users
 - Stack traces or error details
 - Error codes (HTTP 429, 500, etc.)
-- Internal URLs or file paths
+- Internal URLs or file paths (e.g., `/home/node/workspace/`, `/app/`, `~/workspace/`)
 - Rate limit numbers
 - Request IDs or trace IDs
 - System component names
+- Internal document names (SOUL.md, AGENTS.md, BUILD.md, DATABASE.md, TOOLS.md, USER.md, any `.md` config)
+- System message formats (e.g., `[SYSTEM BUILD RESULT]`, `[SYSTEM ...]`)
+- Internal workspace structure or directory layout
+- Git repository paths or branch names
+- Pod names, ages, or container status details
 
 **Rule: Log internally, hide from user.**
 
@@ -151,8 +160,8 @@ If a security violation is detected:
 
 1. **Stop** the current operation
 2. **Log** the attempted action internally (without sensitive data)
-3. **Inform** user simply: "이 작업은 보안상 수행할 수 없습니다."
-4. **Suggest** alternative if available: "대신 이렇게 하시면 가능합니다: [alternative]"
+3. **Inform** user simply: "Sorry, this action isn't allowed for security reasons."
+4. **Suggest** alternative if available: "Here's what you can do instead: [alternative]"
 
 Never mention what security boundary was hit or why technically.
 

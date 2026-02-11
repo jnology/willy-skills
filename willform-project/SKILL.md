@@ -10,10 +10,10 @@ Turn user conversations into complete, production-quality applications.
 
 ## When to Use
 
-- User asks to build something: "쇼핑몰 만들어줘", "블로그 만들어줘", "예약 시스템 필요해"
-- User describes a feature: "상품 목록이 필요해", "댓글 기능 추가해줘"
-- User gives a vague idea: "뭔가 파는 사이트", "회사 소개 페이지"
-- User wants to modify an existing app: "장바구니 추가해줘", "디자인 바꿔줘"
+- User asks to build something: "Build me a store", "I need a booking site", "Create a blog"
+- User describes a feature: "I need a product list", "Add a comment feature"
+- User gives a vague idea: "A site to sell things", "A company landing page"
+- User wants to modify an existing app: "Add a shopping cart", "Change the design"
 
 ## Core Principle: Understand First, Build Right
 
@@ -31,19 +31,19 @@ The user is NOT a developer or tech expert. Ask like you're talking to a friend 
 
 | Area | Good (non-expert friendly) | Bad (too technical) |
 |------|---------------------------|---------------------|
-| Content | "어떤 걸 파시나요? (예: 옷, 음식, 수제품)" | "상품 카테고리 구조를 알려주세요" |
-| Feature | "손님이 직접 주문할 수 있게 할까요?" | "주문 CRUD 기능이 필요하신가요?" |
-| Design | "어떤 느낌이 좋으세요? (밝고 따뜻한 느낌? 깔끔하고 심플한 느낌?)" | "컬러 팔레트를 지정해주세요" |
-| Scale | "처음에 몇 개 정도 올리실 거예요?" | "초기 데이터 시딩 수량을 알려주세요" |
+| Content | "What are you selling? (e.g., clothes, food, handmade goods)" | "Please describe your product category hierarchy" |
+| Feature | "Should customers be able to place orders directly?" | "Do you need order CRUD functionality?" |
+| Design | "What vibe do you want? (warm and friendly? clean and minimal?)" | "Please specify a color palette" |
+| Scale | "How many items will you start with?" | "What's the initial data seeding count?" |
 
 Use everyday language. Include concrete examples so the user can just pick one.
-Never use words like: 기능, 모듈, 시스템, 구현, 데이터, 카테고리 구조, UI/UX
+Never use words like: module, system, implementation, data schema, category structure, UI/UX
 
 ### When to Skip Questions and Build Immediately
-- Simple modifications: "장바구니 추가해줘" → just do it
+- Simple modifications: "Add a shopping cart" → just do it
 - Detailed requests with enough context already given → just build
-- User says "알아서 해줘" or "빨리 만들어줘" → use smart defaults from app type reference
-- Follow-up changes: "색상 바꿔줘" → just do it
+- User says "just do it" or "build it quickly" → use smart defaults from app type reference
+- Follow-up changes: "Change the color" → just do it
 
 ## Completeness Thinking Framework
 
@@ -84,8 +84,8 @@ Think about what actions visitors take from start to finish.
 Think about the small details that separate a prototype from a real app.
 
 - Responsive layout (mobile, tablet, desktop)
-- Korean language UI throughout
-- Empty states ("아직 상품이 없습니다")
+- English language UI throughout
+- Empty states ("No products found")
 - Loading indicators
 - Consistent visual design (colors, spacing, typography)
 - Navigation between all pages
@@ -109,33 +109,62 @@ Every app needs admin protection. In v1, use simple password-based admin access 
 
 **Implementation:**
 
-```typescript
-// lib/auth.ts — checkPassword, setAdminCookie (httpOnly, 1 day), getAdminCookie
-import { cookies } from 'next/headers'
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin1234'
-export function checkPassword(pw: string) { return pw === ADMIN_PASSWORD }
-export async function setAdminCookie() {
-  (await cookies()).set('admin-auth', 'true', { httpOnly: true, maxAge: 86400 })
-}
-export async function getAdminCookie() {
-  return (await cookies()).get('admin-auth')?.value === 'true'
-}
-```
+`lib/auth.ts` and admin API routes are pre-committed to the workspace. **Do NOT recreate them.**
 
-**Admin layout (`app/admin/layout.tsx`) — inline login, NO redirect:**
+Available imports from `@/lib/auth`:
+- `verifyPassword(password)` — timing-safe password check (SHA-256 hashing, constant-time comparison)
+- `createAdminToken()` — creates HMAC-signed admin cookie token
+- `verifyAdminToken(token)` — verifies token signature
+
+Pre-committed API routes:
+- `POST /api/admin/login` — verifies password, sets signed cookie
+- `GET /api/admin/check` — verifies signed cookie
+- `POST /api/admin/logout` — deletes cookie
+
+**Admin layout (`app/admin/layout.tsx`) — client component, check auth via API, inline login:**
 
 ```tsx
-import { getAdminCookie } from '@/lib/auth'
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  if (!(await getAdminCookie())) return <AdminLoginForm />
+'use client'
+import { useEffect, useState } from 'react'
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const [authenticated, setAuthenticated] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/admin/check').then(r => r.json()).then(d => {
+      setAuthenticated(d.authenticated)
+      setLoading(false)
+    })
+  }, [])
+
+  if (loading) return <div className="p-8">Loading...</div>
+  if (!authenticated) return <AdminLoginForm onSuccess={() => setAuthenticated(true)} />
+
   return <div>{/* admin sidebar nav + children */}</div>
 }
 ```
 
 The layout renders a login form INLINE when not authenticated. No separate login page, no redirect.
 
-**Default password:** `admin1234` (set via `ADMIN_PASSWORD` env var)
-Include this in seed data instructions to the user: "관리자 비밀번호는 admin1234 입니다."
+**NEVER do these (security violations):**
+- Recreate `lib/auth.ts` — it is pre-committed with SHA-256 hashing
+- Use plain cookies like `admin-auth=true` — signed tokens only
+- Hardcode passwords or default to `admin1234` — password is configured by platform via `ADMIN_PASSWORD` env var
+- Create a separate `/admin/login` page — use inline form in layout
+- Display the admin password anywhere in the UI (login page, help text, placeholder, tooltip, comment, or any visible element)
+- Include password hints like "Default password: ..." or "Try admin1234" in any generated code
+
+**Password configuration:**
+The admin password is set via `ADMIN_PASSWORD` environment variable (configured by the platform). Do NOT mention a default password to users.
+
+**Password delivery:**
+- The admin password is AUTO-GENERATED by the platform and stored in Kubernetes secrets
+- You do NOT have access to the actual password — NEVER fabricate, guess, or make up a password (e.g., "admin1234", "password123", "admin")
+- The platform automatically sends the admin password to the user via WhatsApp after the first successful build
+- When telling the user the app is ready, say: "Your admin panel is at [URL]/admin. The admin password has been sent separately via WhatsApp."
+- If the user says the password doesn't work or asks for their password, tell them: "I don't have access to your admin password. Please check your WhatsApp messages — the platform sends it automatically after deployment."
+- NEVER display the password in the app UI, source code comments, or any web-accessible page
 
 ### 6. What to Skip in v1
 
@@ -145,16 +174,73 @@ Not everything needs to be in v1. Skip these unless specifically requested:
 - **Email notifications** — no SMTP, no email sending. Admin checks the dashboard.
 - **File upload** — no file upload UI. Use `imageUrl` text field instead. (See Image Handling)
 - **SEO optimization** — no meta tags, no sitemap, no structured data.
-- **Multi-language (i18n)** — Korean only. No language switcher.
+- **Multi-language (i18n)** — English only. No language switcher.
 - **User registration/login** — visitors are anonymous. Only admin has a password.
 - **Analytics** — no tracking, no page view counts.
 - **Real-time features** — no WebSocket, no live updates. Refresh to see changes.
+
+## Skeleton-Based Development
+
+Pre-built skeleton apps are stored in the **Forgejo skeleton catalog** (`skeletons/catalog` repo). When a user describes what they want, select the closest skeleton, copy it to the project repo, and modify it to match their needs.
+
+### Skeleton Catalog Access
+
+The skeleton catalog is available at `FORGEJO_URL/skeletons/catalog`. Each skeleton type is a directory containing a complete, buildable Next.js app.
+
+**Available skeleton types:**
+
+| Type | Best for | Key models |
+|------|----------|------------|
+| `service-booking` | Salons, consultants, repair services | Service, Booking |
+| `product-catalog` | Custom goods, furniture, B2B | Product, Quote, QuoteItem |
+| `event-registration` | Classes, workshops, seminars | Event, Registration |
+| `portfolio` | Photographers, designers, agencies | Project, ProjectImage, ContactSubmission |
+| `restaurant-menu` | Restaurants, cafes, takeout | MenuItem, Order, OrderItem |
+| `directory` | Business directories, resource lists | Listing |
+| `waitlist` | Product launches, pre-orders | WaitlistSignup |
+
+### How to Use Skeletons
+
+1. **Analyze the user's request** — understand what they want to build
+2. **Select the closest skeleton** — pick the type that best matches the user's description
+3. **Read skeleton files** — browse `skeletons/catalog/{type}/` to understand the structure
+4. **Copy files to project repo** — commit all skeleton files to the user's project repo
+5. **Modify for user's needs** — rename models, adjust pages, update styling and text
+6. **Preserve build structure** — never modify Dockerfile, `.forgejo/workflows/`, `next.config.ts`, `lib/db.ts`
+
+### Selecting the Right Skeleton
+
+Match user descriptions to skeleton types:
+- "booking site", "appointment", "salon" → `service-booking`
+- "product list", "quote request", "catalog" → `product-catalog`
+- "event", "class registration", "workshop" → `event-registration`
+- "portfolio", "agency site", "showcase" → `portfolio`
+- "restaurant", "menu", "food ordering" → `restaurant-menu`
+- "directory", "business listing", "resource list" → `directory`
+- "waitlist", "coming soon", "launch page" → `waitlist`
+
+If no skeleton matches well, use the **Full App Replacement** process below to build from scratch.
+
+### Modification Scope
+
+| What | How |
+|------|-----|
+| Schema | Rename/add/remove models and fields in `prisma/schema.prisma` |
+| Pages | Adjust content, add/remove pages in `app/` |
+| Styling | Change accent color, adjust layout (keep Tailwind + Inter font) |
+| Actions | Modify CRUD operations in `lib/actions.ts` for new/renamed models |
+| Seed data | Update sample data to match the user's theme and business |
+| Navigation | Update nav links to match new page structure |
+
+### When to Build from Scratch
+
+If the user's request is **fundamentally different** from any available skeleton (e.g., a survey builder, inventory tracker, or anything with unique data models and flows), use the Full App Replacement process below instead of modifying a skeleton.
 
 ## App Type Reference
 
 Use these as starting points, NOT templates. Every app should be tailored to the user's specific description. Add or remove features based on what the user actually needs.
 
-### Shopping / E-commerce ("쇼핑몰", "스토어", "파는 사이트")
+### Shopping / E-commerce ("online store", "shop", "sell things")
 
 Pages:
 - `/` — Home: hero banner, featured products, category shortcuts
@@ -169,13 +255,13 @@ Pages:
 - `/admin/products/[id]/edit` — Product edit form
 - `/admin/categories` — Category CRUD: name, description, display order
 - `/admin/orders` — Order management: list with status filter, status update buttons
-- `/admin/seed` — Seed data page: "샘플 데이터 생성" button
+- `/admin/seed` — Seed data page: "Generate Sample Data" button
 
 Data models:
 - `Category` (id, name, description, displayOrder, createdAt)
-- `Product` (id, name, description, price Int, imageUrl?, categoryId → Category, stock Int, featured Boolean, createdAt, updatedAt)
-- `Order` (id, customerName, phone, address, notes?, status enum[pending/confirmed/shipped/delivered/cancelled], totalAmount Int, createdAt)
-- `OrderItem` (id, orderId → Order, productName, productPrice Int, quantity Int)
+- `Product` (id, name, description, price Float, imageUrl?, categoryId → Category, stock Int, featured Boolean, createdAt, updatedAt)
+- `Order` (id, customerName, phone, address, notes?, status enum[pending/confirmed/shipped/delivered/cancelled], totalAmount Float, createdAt)
+- `OrderItem` (id, orderId → Order, productName, productPrice Float, quantity Int)
 
 MUST-HAVE for v1:
 - Search by product name (case-insensitive `contains`)
@@ -185,11 +271,11 @@ MUST-HAVE for v1:
 - Cart using React Context + `localStorage` persistence
 - Cart badge in navigation showing item count
 - Quantity increment/decrement in cart
-- Order form validation: name required, phone required (digits only), address required
+- Order form validation: name required, phone required, address required
 - Order status workflow: pending → confirmed → shipped → delivered (with cancelled option)
 - Admin dashboard with today's stats
 - Category CRUD with display order
-- Seed data: 3 categories, 8-10 products with Korean names and picsum images, 2-3 sentence descriptions each, varied price ranges (5,000원~150,000원)
+- Seed data: 3 categories, 8-10 products with English names and picsum images, 2-3 sentence descriptions each, varied price ranges ($9.99~$299.99)
 
 Layout guidelines:
 - Home: hero banner, then featured products grid (3-col)
@@ -204,7 +290,7 @@ SKIP in v1:
 - Wishlist
 - Coupon/discount system
 
-### Blog / Content Site ("블로그", "글 쓰는 사이트")
+### Blog / Content Site ("blog", "writing site")
 
 Pages:
 - `/` — Home: latest posts (6), featured post highlight, category list sidebar
@@ -216,7 +302,7 @@ Pages:
 - `/admin/posts/[id]/edit` — Post edit form
 - `/admin/categories` — Category CRUD: name, slug
 - `/admin/comments` — Comment moderation: list, delete button
-- `/admin/seed` — Seed data page: "샘플 데이터 생성" button
+- `/admin/seed` — Seed data page: "Generate Sample Data" button
 
 Data models:
 - `Category` (id, name, slug, createdAt)
@@ -228,13 +314,13 @@ MUST-HAVE for v1:
 - Search by title (case-insensitive `contains`)
 - Pagination (10 posts per page)
 - Published/draft toggle in admin
-- Slug auto-generation from title (Korean → transliterated or timestamp-based)
-- Reading time estimate (`Math.ceil(content.length / 500)` minutes)
+- Slug auto-generation from title (lowercase, hyphenated)
+- Reading time estimate (`Math.ceil(content.split(' ').length / 200)` minutes)
 - Comment form on post detail (name + content, no login required)
 - Comment count display on post list cards
-- Formatted dates in Korean ("2024년 1월 15일")
+- Formatted dates in English ("January 15, 2024")
 - Admin dashboard with post/comment statistics
-- Seed data: 3 categories, 6-8 posts with realistic Korean content (3-5 paragraphs, 150-300 words each), 2-3 comments per post
+- Seed data: 3 categories, 6-8 posts with realistic English content (3-5 paragraphs, 150-300 words each), 2-3 comments per post
 
 Layout guidelines:
 - Home: featured post as full-width card with large image, then 2-column grid of recent posts
@@ -250,11 +336,11 @@ SKIP in v1:
 - Social sharing buttons
 - RSS feed
 
-### Reservation / Booking ("예약", "예약 시스템", "예약 사이트")
+### Reservation / Booking ("booking", "reservation", "appointment")
 
 Pages:
 - `/` — Home: service overview, business hours, call-to-action booking button
-- `/services` — Service list: cards with name, duration, price, "예약하기" button
+- `/services` — Service list: cards with name, duration, price, "Book Now" button
 - `/booking` — Booking form: service selector, date picker, available time slot selector, customer info (name, phone, email, notes)
 - `/booking/complete` — Booking confirmation: reference number, summary, "another booking" link
 - `/admin` — Admin dashboard: today's bookings, upcoming bookings count, status breakdown
@@ -262,7 +348,7 @@ Pages:
 - `/admin/bookings/[id]` — Booking detail: full info, status change, notes
 - `/admin/services` — Service CRUD: name, description, duration, price
 - `/admin/timeslots` — Time slot management: day-of-week, start/end time, max bookings per slot
-- `/admin/seed` — Seed data page: "샘플 데이터 생성" button
+- `/admin/seed` — Seed data page: "Generate Sample Data" button
 
 Data models:
 - `Service` (id, name, description, duration Int minutes, price Int, imageUrl?, active Boolean default true, createdAt)
@@ -292,7 +378,7 @@ SKIP in v1:
 - Staff assignment
 - Multi-location support
 
-### Portfolio / Company Site ("포트폴리오", "회사 소개", "홈페이지")
+### Portfolio / Company Site ("portfolio", "company page", "homepage")
 
 Pages:
 - `/` — Home: hero section (large image/text), about summary, featured projects (3), contact CTA
@@ -305,7 +391,7 @@ Pages:
 - `/admin/projects/new` — Project form: title, description, imageUrl, category, featured toggle, displayOrder
 - `/admin/projects/[id]/edit` — Project edit form
 - `/admin/messages` — Contact messages: list with read/unread filter, mark as read, delete
-- `/admin/seed` — Seed data page: "샘플 데이터 생성" button
+- `/admin/seed` — Seed data page: "Generate Sample Data" button
 
 Data models:
 - `Project` (id, title, description, imageUrl?, category String, featured Boolean default false, displayOrder Int default 0, createdAt)
@@ -321,7 +407,7 @@ MUST-HAVE for v1:
 - Success message after form submission
 - Unread message indicator in admin navigation
 - Mark message as read functionality
-- Seed data: 3 categories ("웹 디자인", "브랜딩", "모바일 앱"), 6-8 projects with picsum images, 3 sample messages
+- Seed data: 3 categories ("Web Design", "Branding", "Mobile App"), 6-8 projects with picsum images, 3 sample messages
 
 SKIP in v1:
 - Image gallery / lightbox on project detail
@@ -330,7 +416,7 @@ SKIP in v1:
 - Team member profiles with individual pages
 - Animated transitions
 
-### Task / Todo App ("할 일", "할일 관리", "프로젝트 관리")
+### Task / Todo App ("todo", "task manager", "project tracker")
 
 Pages:
 - `/` — Dashboard: task statistics (total, by status, by priority), overdue count, recent tasks
@@ -340,7 +426,7 @@ Pages:
 - `/tasks/[id]/edit` — Edit task form
 - `/admin` — Admin dashboard: statistics charts (status distribution, overdue trend)
 - `/admin/categories` — Category CRUD: name, color (hex code)
-- `/admin/seed` — Seed data page: "샘플 데이터 생성" button
+- `/admin/seed` — Seed data page: "Generate Sample Data" button
 
 Data models:
 - `Category` (id, name, color String default "#6B7280", createdAt)
@@ -358,7 +444,7 @@ MUST-HAVE for v1:
 - Statistics dashboard: total tasks, completion rate %, tasks by status (bar or pie), overdue count
 - Category color displayed as dot/badge next to task
 - Bulk status change (select multiple → change status)
-- Seed data: 3 categories ("업무", "개인", "학습"), 8-10 tasks with varied statuses/priorities/due dates
+- Seed data: 3 categories ("Work", "Personal", "Learning"), 8-10 tasks with varied statuses/priorities/due dates
 
 SKIP in v1:
 - Drag-and-drop Kanban board
@@ -370,19 +456,21 @@ SKIP in v1:
 
 ## Any Other App Type
 
-When a user requests an app that doesn't match the 5 types above (e.g., "레시피 앱", "재고 관리", "회원 관리", "설문조사"), use this universal framework.
+When a user requests an app that doesn't match the 5 types above (e.g., "recipe app", "inventory management", "membership tracker", "survey builder"), use this universal framework.
 
-**Every app, regardless of type, MUST include these 9 items:**
+**Every app, regardless of type, MUST include these 11 items:**
 
 1. **Main list page** (`/`) — shows all primary items with search + filter + pagination
 2. **Detail page** (`/items/[id]`) — shows full info for one item
 3. **Admin dashboard** (`/admin`) — password-protected admin area with key statistics and recent activity
 4. **Admin CRUD** (`/admin/items`) — create, read, update, delete primary items
-5. **Seed data button** (`/admin/seed`) — "샘플 데이터 생성" button that creates 6-10 realistic Korean items
+5. **Seed data button** (`/admin/seed`) — "Generate Sample Data" button that creates 6-10 realistic English items
 6. **Password protection** — `lib/auth.ts` with cookie-based admin auth (inline login form in layout, NO separate login page)
 7. **Responsive design** — works on mobile, tablet, desktop
-8. **Korean UI** — all text in Korean, Korean date/currency formatting
-9. **Empty states** — friendly Korean messages when no data exists
+8. **English UI** — all text in English, US date/currency formatting
+9. **Empty states** — friendly English messages when no data exists
+10. **Toast notifications** — every user action (submit, delete, save) shows success/error toast feedback
+11. **Loading states** — skeleton or spinner during data fetch, never blank screen
 
 **Planning process for unknown app types:**
 
@@ -401,10 +489,10 @@ Every app MUST include seed data functionality. Users need to see a working app 
 
 **Admin seed page (`app/admin/seed/page.tsx`):**
 
-- Large centered button: "샘플 데이터 생성"
-- Below button: explanation text "테스트용 샘플 데이터를 생성합니다."
+- Large centered button: "Generate Sample Data"
+- Below button: explanation text "Creates sample data for testing."
 - After clicking: show success message with count of created items
-- If data already exists: show warning "이미 데이터가 있습니다. 중복 생성됩니다." but still allow
+- If data already exists: show warning "Data already exists. Duplicates will be created." but still allow
 
 **Server action (`lib/actions.ts` — `seedData()`):**
 
@@ -413,16 +501,16 @@ Every app MUST include seed data functionality. Users need to see a working app 
 export async function seedData() {
   // Create categories first (use upsert for idempotency)
   // Then create items with relationships
-  // Return { success: true, message: "카테고리 3개, 상품 10개가 생성되었습니다." }
+  // Return { success: true, message: "Created 3 categories and 10 products." }
 }
 ```
 
 ### Seed Data Rules
 
-1. **Korean realistic data** — use realistic Korean names, descriptions, addresses, phone numbers
-   - Names: "김민수", "이서연", "박지훈", "최수아"
-   - Products: "수제 초콜릿 케이크", "핸드드립 커피 세트", "유기농 샐러드 키트"
-   - Categories: "전자기기", "패션", "식품", "생활용품"
+1. **Realistic English data** — use realistic English names, descriptions, addresses, phone numbers
+   - Names: "John Smith", "Sarah Johnson", "Michael Chen", "Emily Davis"
+   - Products: "Artisan Chocolate Cake", "Pour-Over Coffee Set", "Organic Salad Kit"
+   - Categories: "Electronics", "Fashion", "Food & Drink", "Home & Living"
 2. **6-10 items minimum** — enough to demonstrate pagination and filtering
 3. **Idempotent** — use `upsert` or check-before-create to avoid duplicates on re-run
 4. **Images** — use `https://picsum.photos/seed/{unique-key}/400/300` for realistic placeholder images
@@ -437,7 +525,7 @@ export async function seedData() {
 
 ### Seed Data in Admin Navigation
 
-Add a "샘플 데이터" link in the admin sidebar/navigation that goes to `/admin/seed`.
+Add a "Sample Data" link in the admin sidebar/navigation that goes to `/admin/seed`.
 
 ## Image Handling
 
@@ -460,9 +548,9 @@ Image input in admin forms is a simple text input:
 
 ```tsx
 <div>
-  <label>이미지 URL</label>
+  <label>Image URL</label>
   <input type="url" name="imageUrl" placeholder="https://example.com/image.jpg" />
-  <p className="text-sm text-gray-500">이미지 URL을 입력하세요. 비워두면 기본 이미지가 표시됩니다.</p>
+  <p className="text-sm text-gray-500">Enter an image URL. A placeholder will be shown if left empty.</p>
 </div>
 ```
 
@@ -491,8 +579,8 @@ Use picsum.photos with unique seed keys for consistent, reproducible images:
 
 ```typescript
 const products = [
-  { name: "수제 초콜릿 케이크", imageUrl: "https://picsum.photos/seed/cake/400/300" },
-  { name: "핸드드립 커피 세트", imageUrl: "https://picsum.photos/seed/coffee/400/300" },
+  { name: "Artisan Chocolate Cake", imageUrl: "https://picsum.photos/seed/cake/400/300" },
+  { name: "Pour-Over Coffee Set", imageUrl: "https://picsum.photos/seed/coffee/400/300" },
   // ...
 ];
 ```
@@ -508,7 +596,7 @@ Match your implementation scope to the app's actual needs. Start at the right le
 | 3 | CRUD app | + lib/actions.ts + forms + validation | Create, edit, delete, admin |
 | 4 | Multi-model app | + relations + cart/booking + search/filter | Full features, pagination, seed data |
 
-Most user requests ("쇼핑몰 만들어줘") are **Level 4**. Simple requests ("회사 소개 페이지") are **Level 1-2**.
+Most user requests ("build me a store") are **Level 4**. Simple requests ("company landing page") are **Level 1-2**.
 
 ## Building Process
 
@@ -523,13 +611,13 @@ OBJECTIVES for [app type]:
 □ User can view [item] detail with all information
 □ User can [primary action] (e.g., add to cart, submit booking, create post)
 □ Admin can manage all [items] via CRUD interface
-□ Admin can generate seed data with 6-10 realistic Korean items
-□ Admin access is password-protected (cookie-based, default: admin1234)
-□ All UI text is in Korean with proper formatting (dates, currency)
+□ Admin can generate seed data with 6-10 realistic English items
+□ Admin access is password-protected (HMAC-signed tokens, SHA-256 hashing)
+□ All UI text is in English with proper formatting (dates, currency)
 □ App is responsive (mobile, tablet, desktop)
 □ Every list page has search + filter + pagination
-□ Every form has validation with Korean error messages
-□ Empty states show friendly Korean messages
+□ Every form has validation with English error messages
+□ Empty states show friendly English messages
 □ Design uses one consistent accent color from the Color System
 ```
 
@@ -540,8 +628,8 @@ Then verify: Does EVERY objective map to at least one file you will create?
 Output a brief, friendly message as plain text BEFORE any tool calls.
 Text output between tool calls is delivered to the user immediately.
 
-- "요청하신 쇼핑몰을 만들고 있습니다..."
-- "블로그를 만들기 시작했습니다..."
+- "Building your online store now..."
+- "Starting to create your blog..."
 
 ### Step 3: Build ALL files
 
@@ -560,7 +648,7 @@ Build order:
 10. Admin layout (`app/admin/layout.tsx`) — with inline login form + auth check (NO separate login page)
 11. All admin pages (e.g., `app/admin/page.tsx`, `app/admin/products/page.tsx`)
 12. Admin seed page (`app/admin/seed/page.tsx`)
-13. Shared components (e.g., `components/ProductCard.tsx`)
+13. Shared components: `components/toast.tsx` (ToastProvider + useToast), `components/modal.tsx` (ConfirmModal), and feature components (e.g., `components/ProductCard.tsx`)
 14. `package.json` — with all dependencies
 15. `next.config.ts` — with `output: "standalone"`
 16. `Dockerfile` — copy from DATABASE.md template (NEVER write your own)
@@ -586,9 +674,12 @@ Before committing, check:
 - Card consistency — all list items use Card Pattern with `rounded-2xl` and `hover:shadow-lg`?
 - Navigation quality — sticky nav with `backdrop-blur-md`?
 - Whitespace — sections separated by `py-16`, cards have `gap-6`?
-- Typography — `Noto_Sans_KR` imported via `next/font/google`?
+- Typography — `Inter` imported via `next/font/google`?
 - Color discipline — one accent color used consistently (see Color System table)?
 - Interactive feedback — all buttons have `hover:` state and `transition-colors`?
+- Toast feedback — every form submit and delete action shows toast notification?
+- Loading states — data-dependent views use `<Suspense>` + skeleton, never blank screen?
+- Delete confirmation — destructive actions (delete, reset) show confirm modal before executing?
 
 ANY answer is NO → fix before committing.
 
@@ -606,7 +697,7 @@ ANY answer is NO → fix before committing.
 ### Step 5: Commit & push
 
 Use the willform-forgejo skill to commit and push.
-Output: "준비 중입니다... (보통 2-3분 걸려요)"
+Output: "Getting things ready... (usually takes 2-3 minutes)"
 
 ### Step 6: Wait for build (MANDATORY — never skip)
 
@@ -626,30 +717,30 @@ After build succeeds, verify the app is actually running and accessible:
 1. Check pods: `/data/bin/kubectl get pods -n {userNamespace}` — must show Running, 1/1 Ready, 0 restarts
 2. Health check: `curl -sf https://{appDomain} --max-time 10` — must return HTTP 200
 3. If pods are not Running or curl fails: wait 15s and retry (up to 3 times)
-4. If still failing: output "문제가 생겼습니다. 확인하고 있습니다." and diagnose
+4. If still failing: output "Something went wrong. Looking into it now." and diagnose
 
 ### Step 8: Report completion
 
 ONLY after ALL checks pass (build success + pods Running + HTTP 200):
-- Output: "완료되었습니다! {URL}에서 확인하실 수 있습니다."
-- Then: "관리자 페이지는 {URL}/admin 에서 접속하실 수 있어요. 비밀번호는 admin1234 입니다."
-- Then ask: "어떠세요? 수정하거나 추가하고 싶은 부분이 있으면 말씀해주세요."
+- Output: "All done! Check it out at {URL}."
+- Then: "You can access the admin panel at {URL}/admin."
+- Then ask: "How does it look? Let me know if you'd like to change or add anything."
 
 ## Full App Replacement
 
-When a user asks to build a COMPLETELY DIFFERENT app (e.g., "쇼핑몰 만들어줘" after already having a blog, or "블로그 만들어줘" after having a shopping mall):
+When a user asks to build a COMPLETELY DIFFERENT app (e.g., "build me a store" after already having a blog, or "create a blog" after having a store):
 
 ### How to Detect
 
 A full replacement is needed when:
 - User asks for a different app TYPE (shopping → blog, blog → todo, etc.)
-- User says "다시 만들어줘", "새로 만들어줘", "다른 거 만들어줘"
+- User says "start over", "build a new one", "make something different"
 - The requested app has fundamentally different data models and pages
 
 A full replacement is NOT needed when:
-- User asks to add a feature ("장바구니 추가해줘") → use Feature Addition
-- User asks to modify existing app ("디자인 바꿔줘") → use Feature Addition
-- User asks to fix something ("이거 안 돼") → fix the existing code
+- User asks to add a feature ("Add a shopping cart") → use Feature Addition
+- User asks to modify existing app ("Change the design") → use Feature Addition
+- User asks to fix something ("This doesn't work") → fix the existing code
 
 ### Cleanup Process (CRITICAL)
 
@@ -723,8 +814,8 @@ When a user asks to add a feature to an existing app:
 ## Design Principles
 
 Follow the Visual Design System defined in willform-coding skill.
-Key rules: ONE accent color per app, `bg-gray-50` body, Noto Sans KR font, responsive grid layout.
-Korean UI throughout: dates (2024년 1월 15일), currency (12,000원), all labels/messages in Korean.
+Key rules: ONE accent color per app, `bg-gray-50` body, Inter font, responsive grid layout.
+English UI throughout: dates (January 15, 2024), currency ($12.00), all labels/messages in English.
 
 ## User Communication
 
@@ -732,13 +823,13 @@ Korean UI throughout: dates (2024년 1월 15일), currency (12,000원), all labe
 
 | Situation | Message |
 |-----------|---------|
-| Starting to build | "요청하신 [앱이름]을 만들고 있습니다..." |
-| Adding a feature | "[기능명]을 추가하고 있습니다..." |
-| Almost done coding | "거의 다 됐습니다! 마무리 중이에요." |
-| Preparing to go live | "준비 중입니다... (보통 2-3분 걸려요)" |
-| App is live | "완료되었습니다! [URL]에서 확인하실 수 있습니다." |
-| Asking for feedback | "어떠세요? 수정하거나 추가하고 싶은 부분이 있으면 말씀해주세요." |
-| Admin password | "관리자 페이지는 [URL]/admin 에서 접속하실 수 있어요. 비밀번호는 admin1234 입니다." |
+| Starting to build | "Building your [app name] now..." |
+| Adding a feature | "Adding [feature name]..." |
+| Almost done coding | "Almost done! Just finishing up." |
+| Preparing to go live | "Getting things ready... (usually takes 2-3 minutes)" |
+| App is live | "All done! Check it out at [URL]." |
+| Asking for feedback | "How does it look? Let me know if you'd like to change or add anything." |
+| Admin panel access | "You can access the admin panel at [URL]/admin." |
 
 ### What to NEVER Say
 
@@ -747,14 +838,14 @@ FORBIDDEN words: See willform-guard SKILL.
 ### How to Describe Features
 
 Good (feature-focused):
-- "상품을 등록하고 관리할 수 있는 관리자 페이지를 만들었습니다."
-- "장바구니에 담고 주문할 수 있는 기능을 추가했습니다."
-- "카테고리별로 글을 분류할 수 있게 했습니다."
+- "I've built an admin page where you can add and manage products."
+- "Added a shopping cart so customers can place orders."
+- "Posts can now be organized by category."
 
 Bad (technical):
-- "Product 모델에 category relation을 추가했습니다."
-- "Server Action으로 CRUD를 구현했습니다."
-- "App Router에 동적 라우트를 설정했습니다."
+- "Added a category relation to the Product model."
+- "Implemented CRUD via Server Actions."
+- "Set up dynamic routes in App Router."
 
 ## Handling Vague Requests
 
@@ -762,11 +853,11 @@ When the user's request is unclear:
 
 | User Says | Interpretation | Action |
 |-----------|---------------|--------|
-| "사이트 만들어줘" | Generic website | Ask: "어떤 종류의 사이트를 만들어드릴까요? 예를 들어 쇼핑몰, 블로그, 회사 소개 등이 가능합니다." |
-| "뭔가 파는 사이트" | E-commerce | Build a shopping site with products, cart, checkout |
-| "심플한 블로그" | Minimal blog | Build a clean blog with posts and categories (skip comments, tags) |
-| "예약 받을 수 있는 사이트" | Booking system | Build a reservation system with services and time slots |
-| "상품 추가해줘" | Add product feature | Check if admin page exists, add product CRUD if not |
-| "디자인 바꿔줘" | Redesign | Ask: "어떤 느낌으로 바꿔드릴까요? 더 모던하게, 컬러풀하게, 심플하게?" |
+| "Build me a site" | Generic website | Ask: "What kind of site would you like? For example, an online store, blog, company page, etc." |
+| "I want to sell things" | E-commerce | Build a shopping site with products, cart, checkout |
+| "Simple blog" | Minimal blog | Build a clean blog with posts and categories (skip comments, tags) |
+| "A site where people can book" | Booking system | Build a reservation system with services and time slots |
+| "Add products" | Add product feature | Check if admin page exists, add product CRUD if not |
+| "Change the design" | Redesign | Ask: "What vibe are you going for? More modern, colorful, minimal?" |
 
 Only ask a question when the request is truly ambiguous. If you can make a reasonable interpretation, build it and let the user refine.

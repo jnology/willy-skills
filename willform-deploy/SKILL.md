@@ -11,7 +11,7 @@ After a successful build, verify that the app is live and accessible.
 ## When to Use
 
 - Build just completed successfully
-- User asks "내 앱 상태", "확인해줘", "안 되는데"
+- User asks "how's my app", "check it", "it's not working"
 - Checking if app is running after deployment
 - Troubleshooting a non-responsive app
 
@@ -59,7 +59,7 @@ Must return HTTP 200. If not, the app may still be starting — retry up to 3 ti
 ### Step 4: Report to User
 
 ONLY after ALL checks pass (pods Running + HTTP 200):
-- "완료되었습니다! https://{appDomain} 에서 확인하실 수 있습니다."
+- "All done! Check it out at https://{appDomain}"
 
 ## Troubleshooting
 
@@ -72,14 +72,14 @@ ONLY after ALL checks pass (pods Running + HTTP 200):
    - Port mismatch → app must listen on port 3000
    - Module not found → missing dependency in package.json
 3. Fix the code/Dockerfile, commit, push again
-4. Tell user: "문제가 있어서 수정하고 있습니다."
+4. Tell user: "Found an issue. Working on a fix now."
 
 ### ImagePullBackOff (Build result not found)
 
 1. The build may not have completed successfully
 2. Check Forgejo Actions for build status
 3. If build failed, fix and rebuild (see willform-build skill)
-4. Tell user: "준비 과정에서 문제가 생겨서 다시 시도하고 있습니다."
+4. Tell user: "There was an issue getting things ready. Trying again now."
 
 ### Pending (App stuck waiting)
 
@@ -106,12 +106,12 @@ ONLY after ALL checks pass (pods Running + HTTP 200):
 3. Third failure: STOP and report to user
 
 Tell user honestly what happened (in simple terms):
-- "앱 시작 과정에서 문제가 생겼습니다. 다른 방법을 시도해볼까요?"
-- "데이터 연결에 문제가 있습니다. 확인 후 다시 시도하겠습니다."
+- "Something went wrong while starting your app. Want me to try a different approach?"
+- "There's a problem with the data connection. Let me look into it and try again."
 
 ## Verification Checklist
 
-Before saying "완료되었습니다":
+Before saying "All done":
 - [ ] Pods are `Running` with `1/1` Ready
 - [ ] Pod restart count is `0`
 - [ ] `curl -sf https://{appDomain}` returns HTTP 200
@@ -126,21 +126,21 @@ Text between tool calls is delivered to the user immediately.
 
 | Event | Output text | Then do |
 |-------|-------------|---------|
-| Checking status | "마지막 준비 중입니다..." | kubectl get pods, curl health check |
-| All healthy | "완료되었습니다! https://{appDomain} 에서 확인하실 수 있습니다." | (final) |
-| Problem found, fixing | "문제가 있어서 수정하고 있습니다." | Fix and rebuild |
-| Problem found, need help | "문제가 생겼습니다. [사용자가 이해할 수 있는 설명]" | (wait for user) |
-| App down (user reported) | "확인해보겠습니다." | Diagnose, fix or report |
+| Checking status | "Final checks in progress..." | kubectl get pods, curl health check |
+| All healthy | "All done! Check it out at https://{appDomain}" | (final) |
+| Problem found, fixing | "Found an issue. Working on a fix now." | Fix and rebuild |
+| Problem found, need help | "Something went wrong. [simple explanation the user can understand]" | (wait for user) |
+| App down (user reported) | "Let me take a look." | Diagnose, fix or report |
 
 FORBIDDEN words: See willform-guard SKILL.
 
-Good: "완료되었습니다!", "문제가 있어서 수정하고 있습니다", "확인해보겠습니다"
-Bad: "Pod가 CrashLoopBackOff 상태입니다", "ArgoCD 동기화를 기다리고 있습니다"
+Good: "All done!", "Found an issue. Working on a fix now.", "Let me take a look."
+Bad: "Pod is in CrashLoopBackOff state", "Waiting for ArgoCD sync"
 
 ## IMPORTANT
 
-- NEVER say "완료" or provide URL before all verification checks pass.
-- NEVER use future tense with URL ("배포가 완료되면 ~에서 확인" is FORBIDDEN).
+- NEVER say "done" or provide URL before all verification checks pass.
+- NEVER use future tense with URL ("Once deployed, check it at ~" is FORBIDDEN).
 - URL is given ONLY after confirming the app is live and responding.
 - If the app was already deployed and user asks to update, the same process applies: verify after build.
-- When auto-recovering from errors, tell user "문제가 있었지만 해결했습니다" — no technical details.
+- When auto-recovering from errors, tell user "Ran into a small issue, but it's fixed now." — no technical details.

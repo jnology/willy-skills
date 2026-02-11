@@ -11,7 +11,7 @@ After writing code, trigger a build by pushing to Forgejo and monitor until comp
 ## When to Use
 
 - Code is written and ready to go live
-- User asks to "build", "올려줘", "실행해줘"
+- User asks to "build", "make it live", "run it"
 - Retrying after a failed build
 
 ## Build Trigger Process
@@ -40,7 +40,7 @@ CRITICAL RULES:
 
 After `git push`, the build starts automatically.
 - Typical build time: 2-3 minutes
-- Output text: "준비 중입니다... (보통 2-3분 걸려요)" BEFORE checking build status
+- Output text: "Getting things ready... (usually takes 2-3 minutes)" BEFORE checking build status
 
 ### Step 3: Check Build Status
 
@@ -52,9 +52,9 @@ Check Forgejo Actions to see if the build succeeded or failed:
 ### Step 4: Handle Result
 
 **On success:**
-- Tell user: "거의 완성됐습니다! 조금만 기다려주세요."
+- Tell user: "Almost done! Just a moment."
 - Proceed to deployment verification (willform-deploy skill)
-- Do NOT say "완료" yet — deployment must finish first
+- Do NOT say "done" yet — deployment must finish first
 
 **On failure:**
 - Read the build logs to identify the error
@@ -115,19 +115,19 @@ If you suspect the workflow is broken:
 
 | Event | Message |
 |-------|---------|
-| Starting | "준비 중입니다... (보통 2-3분 걸려요)" |
-| Success | "거의 완성됐습니다! 조금만 기다려주세요." |
-| Failure (retrying) | "문제가 있어서 다시 시도하고 있습니다." |
-| Failure (giving up) | "문제가 생겼습니다. [사용자가 이해할 수 있는 설명]" |
+| Starting | "Getting things ready... (usually takes 2-3 minutes)" |
+| Success | "Almost done! Just a moment." |
+| Failure (retrying) | "Ran into an issue. Trying again now." |
+| Failure (giving up) | "Something went wrong. [simple explanation the user can understand]" |
 
 FORBIDDEN words: See willform-guard SKILL.
 
-Good: "준비 중입니다", "문제가 있었지만 해결했습니다"
-Bad: "Docker 이미지를 빌드하고 Harbor에 푸시 중입니다"
+Good: "Getting things ready", "Ran into a small issue, but it's fixed now"
+Bad: "Building Docker image and pushing to Harbor"
 
 ## IMPORTANT
 
 - Build completion is NOT app completion. Deployment must follow.
-- NEVER say "완료되었습니다" or provide the app URL at build stage.
-- NEVER say "만들었습니다" after code is committed — the app is not live yet.
+- NEVER say "All done" or provide the app URL at build stage.
+- NEVER say "I've built it" after code is committed — the app is not live yet.
 - After successful build, proceed to deployment verification (willform-deploy).

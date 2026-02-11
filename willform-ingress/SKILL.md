@@ -26,66 +26,66 @@ This is ready from the moment the project is created. No setup needed.
 
 | User says | What to do |
 |-----------|------------|
-| "내 주소 알려줘" / "my domain" | Show the current URL |
-| "주소 바꾸고 싶어" / "add domain" | Start custom domain setup |
-| "주소 확인해줘" / "check domain" | Verify domain is working |
-| "주소 삭제해줘" / "remove domain" | Remove custom domain |
-| "주소 목록" / "list domains" | Show all configured domains |
+| "what's my address" / "my domain" | Show the current URL |
+| "I want my own domain" / "add domain" | Start custom domain setup |
+| "check my domain" / "check domain" | Verify domain is working |
+| "remove my domain" / "remove domain" | Remove custom domain |
+| "show all domains" / "list domains" | Show all configured domains |
 
 ## Responding to Users
 
 ### Showing the URL
 Simply provide the URL. No technical details.
 
-Good: "여기서 확인하실 수 있습니다: https://abc123.willform.app"
-Bad: "Ingress가 설정되어 DNS가 Cloudflare를 통해 라우팅됩니다."
+Good: "Here's your app: https://abc123.willform.app"
+Bad: "Ingress is configured and DNS is routed through Cloudflare."
 
 ### Domain Status
 Translate status to plain language.
 
 | Internal Status | User Message |
 |-----------------|--------------|
-| Active | "정상적으로 접속 가능합니다." |
-| Pending DNS | "설정 중입니다. 조금만 기다려주세요." |
-| SSL Provisioning | "거의 준비됐습니다. 잠시만요." |
-| DNS Error | "설정에 문제가 있습니다. 확인해드릴게요." |
-| Unreachable | "접속이 안 되고 있습니다. 확인 중입니다..." |
+| Active | "Your app is up and running." |
+| Pending DNS | "Setting things up. Just a moment." |
+| SSL Provisioning | "Almost ready. Hang tight." |
+| DNS Error | "There's a problem with the setup. Let me check." |
+| Unreachable | "Can't reach the app right now. Looking into it..." |
 
 ## Custom Domain Setup
 
 When a user wants their own domain (e.g., myshop.com):
 
 ### Step 1: Explain Simply
-"나만의 주소를 사용하시려면 두 가지 설정이 필요합니다."
+"To use your own domain, you'll need to set up two things."
 
 ### Step 2: DNS Instructions (Simplified)
 Provide exact instructions for their domain provider:
 
 ```
-1. 도메인 관리 페이지에서 다음 설정을 추가해주세요:
+1. Go to your domain settings and add these two records:
 
-   확인용 설정:
-   - 종류: TXT
-   - 이름: _willform.{사용자도메인}
-   - 값: {verification_token}
+   Verification record:
+   - Type: TXT
+   - Name: _willform.{userDomain}
+   - Value: {verification_token}
 
-   연결 설정:
-   - 종류: CNAME
-   - 이름: {사용자도메인}
-   - 값: cname.willform.app
+   Connection record:
+   - Type: CNAME
+   - Name: {userDomain}
+   - Value: cname.willform.app
 
-2. 설정하신 후 "확인해줘"라고 말씀해주세요.
+2. Once you've added them, just say "check it" and I'll verify.
 ```
 
 ### Step 3: Verification
-When user says "확인해줘":
+When user says "check it":
 - Check DNS records
-- If verified: "확인 완료! 곧 사용하실 수 있습니다. (보통 몇 분 정도 걸려요)"
-- If not yet: "아직 설정이 반영되지 않았습니다. 설정 후 최대 몇 시간 걸릴 수 있어요. 나중에 다시 확인해드릴까요?"
+- If verified: "All set! Your domain will be ready shortly. (Usually takes a few minutes.)"
+- If not yet: "The settings haven't taken effect yet. It can take up to a few hours. Want me to check again later?"
 
 ### Step 4: Completion
 When everything is ready:
-"나만의 주소가 준비됐습니다! https://{사용자도메인} 에서 확인하실 수 있습니다."
+"Your custom domain is ready! Check it out at https://{userDomain}"
 
 ## Internal: Domain Accessibility Check
 
@@ -96,7 +96,7 @@ Before reporting a URL to the user, always verify:
 3. Only provide URL after confirmed accessible
 
 If not accessible after retries:
-- User message: "접속 준비 중입니다. 잠시 후 다시 확인해드릴게요."
+- User message: "Still getting things ready. I'll check again shortly."
 - Do NOT provide the URL
 
 ## Internal: Routing Architecture

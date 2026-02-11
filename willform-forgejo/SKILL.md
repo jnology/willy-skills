@@ -76,8 +76,8 @@ done
 Review your work against the original user request. Check:
 1. Does the app have ALL pages the user would expect?
 2. Does the admin page have a seed data function?
-3. Are all forms validated with Korean error messages?
-4. Is the UI fully in Korean?
+3. Are all forms validated with proper error messages?
+4. Is the UI fully in English?
 5. Does navigation link to ALL existing pages (and no deleted pages)?
 6. Does `package.json` have `"build": "next build"` ONLY?
 
@@ -123,7 +123,7 @@ Before committing, verify ALL of these:
 4. **Dockerfile exists** — copy from DATABASE.md template, never write from scratch
 5. **next.config.ts has `output: "standalone"`**
 6. **.forgejo/workflows/ is untouched** — verify with `git diff --name-only | grep .forgejo` (should be empty)
-7. **Seed data action + admin button** — `lib/actions.ts` has `seedSampleData()` function and admin page has "샘플 데이터 생성" button
+7. **Seed data action + admin button** — `lib/actions.ts` has `seedSampleData()` function and admin page has "Generate Sample Data" button
 
 ## Error Recovery
 
@@ -229,5 +229,5 @@ After committing, behavior depends on the project's approval level:
 
 When describing changes for approval:
 - Use feature descriptions, not file lists
-- Example: "상품 목록과 장바구니 기능을 추가했습니다. 확인해주시겠어요?"
+- Example: "I've added a product listing and shopping cart. Want me to go ahead?"
 - NEVER show code diffs, file paths, or technical details to the user

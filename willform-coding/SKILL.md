@@ -10,7 +10,7 @@ Build complete, production-quality apps on the Willform platform.
 
 ## When to Use
 
-- Creating new project from scratch
+- Modifying a skeleton app to match user requirements
 - Adding features to existing project
 - Writing components or pages
 - Setting up database models
@@ -27,19 +27,27 @@ Every generated app must satisfy ALL of these before committing:
 5. Server Actions return `{ error }` on all validation failures
 6. `package.json` has `"build": "next build"` only (no prisma commands)
 7. `next.config.ts` includes `output: "standalone"`
-8. All UI text is in Korean
+8. **ALL UI text MUST be in English** — Korean, Japanese, Chinese, or any non-English text in UI is a build-blocking violation
+9. Home page has a visually impactful hero section (not just plain text)
+10. All list cards have hover effects and consistent rounded-2xl styling
+11. Every user action (submit, delete, save) shows toast feedback
+12. Data-dependent views have skeleton loading states (never blank screen)
+13. Destructive actions (delete, reset) require confirmation modal
 
 ## Default Tech Stack
 
 | Layer | Technology |
 |-------|------------|
-| Framework | Next.js 15 (App Router, Server Components) |
+| Framework | Next.js (App Router, Server Components) |
 | Language | TypeScript |
-| Styling | Tailwind CSS |
+| Styling | Tailwind CSS with CSS variable design tokens |
+| UI Components | Pure Tailwind — no shadcn/ui, MUI, Chakra, Ant Design |
 | Database | PostgreSQL + Prisma |
 | Config | `output: "standalone"` in next.config.ts |
 
 IMPORTANT: Do NOT use Vite, Express, or React without Next.js. The platform build pipeline is designed for Next.js standalone output only.
+
+IMPORTANT: Do NOT install any external UI component library (shadcn/ui, MUI, Chakra UI, Ant Design, Headless UI, Radix, DaisyUI). Use pure Tailwind CSS + React hooks for ALL UI patterns including toast, modal, and loading states.
 
 ## Project Structure
 
@@ -87,9 +95,9 @@ export default async function ProductList() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
       {products.map(product => (
-        <div key={product.id} className="bg-white rounded-xl border p-4">
-          <h3 className="font-semibold">{product.name}</h3>
-          <p className="text-gray-500">{product.description}</p>
+        <div key={product.id} className="bg-card rounded-xl border border-border p-4">
+          <h3 className="font-semibold text-foreground">{product.name}</h3>
+          <p className="text-muted-foreground">{product.description}</p>
         </div>
       ))}
     </div>
@@ -159,7 +167,7 @@ import { revalidatePath } from 'next/cache'
 
 export async function createItem(formData: FormData) {
   const name = formData.get('name') as string
-  if (!name) return { error: '이름은 필수입니다' }
+  if (!name) return { error: 'Name is required' }
 
   await prisma.item.create({ data: { name } })
   revalidatePath('/')
@@ -193,34 +201,47 @@ Use the standard global singleton pattern to prevent multiple PrismaClient insta
 
 ### Admin Password Protection
 
-Simple password-based admin access using cookies.
+`lib/auth.ts` and admin API routes are pre-committed to the workspace. **Do NOT recreate them.**
 
-```typescript
-// lib/auth.ts — checkPassword, setAdminCookie (httpOnly, 1 day), getAdminCookie
-import { cookies } from 'next/headers'
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin1234'
-export function checkPassword(pw: string) { return pw === ADMIN_PASSWORD }
-export async function setAdminCookie() {
-  (await cookies()).set('admin-auth', 'true', { httpOnly: true, maxAge: 86400 })
-}
-export async function getAdminCookie() {
-  return (await cookies()).get('admin-auth')?.value === 'true'
-}
+Available imports from `@/lib/auth`:
+- `verifyPassword(password)` — timing-safe password check
+- `createAdminToken()` — creates HMAC-signed admin cookie token
+- `verifyAdminToken(token)` — verifies token signature
+
+Pre-committed API routes:
+- `POST /api/admin/login` — verifies password, sets signed cookie
+- `GET /api/admin/check` — verifies signed cookie
+- `POST /api/admin/logout` — deletes cookie
+
+Admin layout pattern:
+```tsx
+// app/admin/layout.tsx — "use client", check /api/admin/check, show login or children
 ```
 
-```tsx
-// app/admin/layout.tsx — check cookie, show login or children
-import { getAdminCookie } from '@/lib/auth'
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  if (!(await getAdminCookie())) return <AdminLoginForm />
-  return <div>{children}</div>
+**Security rules:**
+- NEVER recreate `lib/auth.ts` — import from existing file
+- NEVER use plain cookies like `admin-auth=true`
+- NEVER hardcode default passwords
+- NEVER include password hints, default password text, or any password-related help text in the login form UI (e.g., "Default password: admin1234", "Password: admin1234", placeholder="admin1234")
+- NEVER generate code that displays, logs, or exposes the admin password in any UI element, HTML comment, or console output
+- NEVER fabricate, guess, or make up an admin password in conversation (e.g., "admin1234") — the password is auto-generated by the platform and you do NOT have access to it
+- The login form should show ONLY a password input field and a submit button — no hints, no defaults, no helper text about what the password might be
+- ALWAYS use `verifyAdminToken()` in admin server actions:
+```typescript
+import { verifyAdminToken } from "@/lib/auth";
+import { cookies } from "next/headers";
+
+export async function adminAction() {
+  const token = (await cookies()).get("admin_token")?.value ?? "";
+  if (!verifyAdminToken(token)) throw new Error("Unauthorized");
+  // ... action logic
 }
 ```
 
 **NEVER do these (causes redirect loop):**
-- `redirect('/admin/login')` from admin layout — login page is INSIDE admin layout, creating infinite redirect
-- Create `middleware.ts` that redirects `/admin/*` — same redirect loop issue
-- Create a separate `/admin/login` page — use inline form in layout instead
+- `redirect('/admin/login')` from admin layout
+- Create `middleware.ts` for admin auth redirect
+- Create a separate `/admin/login` page
 
 ### Cart Context + localStorage
 
@@ -241,8 +262,8 @@ Server Action returns `{ errors: Record<string, string> }`, client displays per 
 // Server Action — validate, return { errors } or create + revalidatePath
 export async function createProduct(_prev: any, formData: FormData) {
   const errors: Record<string, string> = {}
-  if (!formData.get('name')) errors.name = '상품명은 필수입니다'
-  if (Number(formData.get('price')) <= 0) errors.price = '가격은 0보다 커야 합니다'
+  if (!formData.get('name')) errors.name = 'Product name is required'
+  if (Number(formData.get('price')) <= 0) errors.price = 'Price must be greater than 0'
   if (Object.keys(errors).length > 0) return { errors }
   // ... create + revalidatePath → return { errors: {} }
 }
@@ -301,7 +322,7 @@ model Product {
 ```typescript
 const products = await prisma.product.findMany({ include: { category: true } })
 await prisma.category.create({
-  data: { name: '전자제품', products: { create: [{ name: '노트북', price: 1500000 }] } },
+  data: { name: 'Electronics', products: { create: [{ name: 'Laptop', price: 1200 }] } },
 })
 ```
 
@@ -311,30 +332,30 @@ Idempotent: check count first, use `createMany`, `revalidatePath` after.
 
 ```typescript
 export async function seedSampleData() {
-  if ((await prisma.product.count()) > 0) return { error: '이미 데이터가 있습니다' }
+  if ((await prisma.product.count()) > 0) return { error: 'Data already exists' }
   await prisma.product.createMany({ data: [
-    { name: '샘플 1', price: 10000, imageUrl: 'https://picsum.photos/seed/p1/400/300' },
-    { name: '샘플 2', price: 20000, imageUrl: 'https://picsum.photos/seed/p2/400/300' },
+    { name: 'Sample Product 1', price: 2999, imageUrl: 'https://picsum.photos/seed/p1/400/300' },
+    { name: 'Sample Product 2', price: 4999, imageUrl: 'https://picsum.photos/seed/p2/400/300' },
   ]})
   revalidatePath('/'); return { success: true }
 }
 ```
 
-Admin button: `<button onClick={() => seedSampleData()}>샘플 데이터 추가</button>`
+Admin button: `<button onClick={() => seedSampleData()}>Add Sample Data</button>`
 
 ### Admin Layout
 
-`app/admin/layout.tsx` — sidebar nav with `Link` components, `bg-gray-50` background.
+`app/admin/layout.tsx` — sidebar nav with `Link` components, `bg-background` background.
 
 ```tsx
-const NAV = [{ href: '/admin', label: '대시보드' }, { href: '/admin/products', label: '상품 관리' }]
-// Layout: flex container, left nav (w-56, bg-white, border-r), right main (flex-1, p-8)
-// Map NAV → <Link> with hover:bg-gray-100 styling
+const NAV = [{ href: '/admin', label: 'Dashboard' }, { href: '/admin/products', label: 'Products' }]
+// Layout: flex container, left nav (w-56, bg-card, border-r border-border), right main (flex-1, p-8)
+// Map NAV → <Link> with hover:bg-accent styling
 ```
 
 ### Image URL Field
 
-Schema: `imageUrl String?`. Display: `<img>` if exists, else fallback `<div>` with first letter + `bg-gray-200`.
+Schema: `imageUrl String?`. Display: `<img>` if exists, else fallback `<div>` with first letter + `bg-muted`.
 Admin form: `<input type="url" name="imageUrl" placeholder="https://..." defaultValue={product?.imageUrl || ''} />`
 
 ## App Completeness Checklist
@@ -348,12 +369,14 @@ Every generated app MUST include ALL of the following. Missing any item = incomp
 - [ ] `lib/utils.ts` — formatters, helpers
 - [ ] `next.config.ts` with `output: "standalone"`
 - [ ] `Dockerfile` — use template from DATABASE.md (NEVER write your own)
+- [ ] `components/toast.tsx` — Toast context provider + useToast hook
+- [ ] `components/modal.tsx` — Confirm modal component
 - [ ] All referenced components exist as files
 
 ### Required Quality
 - [ ] TypeScript for all files (`.tsx`, `.ts`)
 - [ ] Responsive layout (mobile-first, Tailwind breakpoints)
-- [ ] Korean language UI (labels, messages, empty states)
+- [ ] **English-only UI** — every label, message, placeholder, empty state, button, heading, tooltip MUST be in English. Zero non-English strings allowed.
 - [ ] Loading/empty states for all data-dependent views
 - [ ] Error handling in all Server Actions (return `{ error }` on failure)
 - [ ] Proper Prisma relations with cascading deletes where appropriate
@@ -375,7 +398,7 @@ Every generated app MUST include ALL of the following. Missing any item = incomp
 | **Mutations** | Server Actions with `revalidatePath()` |
 | **State** | useState for local UI, Context for cross-component (e.g. cart) |
 | **Forms** | `<form action={serverAction}>` pattern |
-| **Styling** | Tailwind utilities, rounded-xl for cards, consistent gray palette |
+| **Styling** | Tailwind CSS variable tokens (bg-primary, text-foreground, etc.), rounded-xl for cards |
 
 ## Common Pitfalls
 
@@ -396,123 +419,388 @@ Every generated app MUST include ALL of the following. Missing any item = incomp
 | middleware.ts for admin auth | Middleware + layout both redirect = loop | No middleware.ts — use layout auth only |
 | No `tailwind-merge` in deps | Add if using `cn()` utility |
 | `"build": "prisma db push && next build"` in package.json | DB not available during build. Use `"build": "next build"` only |
+| No toast after form submit | Add `ToastProvider` in layout + `useToast()` in forms — see Toast Pattern |
+| No loading state during data fetch | Add skeleton with `animate-pulse` — see Loading Skeleton Pattern |
+| External UI library (shadcn, MUI, etc.) | Use pure Tailwind patterns from this SKILL — zero external UI deps |
 
 ## Dockerfile
 
 DO NOT write your own Dockerfile. Copy the template from DATABASE.md exactly.
 It handles: isolated prisma stage, confbox conflict, standalone output, non-root user.
 
-## Visual Design Quality
+## Visual Design System
 
-Avoid generic "AI-generated" look. Each app should feel intentionally designed.
+Concrete patterns to copy into generated apps. Use these exact className strings.
 
-### Typography
-- Use `Pretendard` or `Noto Sans KR` via next/font/google
-- Headings: font-bold, text-2xl to text-4xl
-- Body: text-sm to text-base, text-gray-600
-- Price/numbers: font-semibold, tabular-nums
+### Design Tokens
 
-### Color System (per app type)
+```tsx
+// The skeleton provides this layout - DO NOT modify
+<body className="font-sans antialiased bg-background text-foreground min-h-screen">
+```
 
-| App Type | Accent | Tailwind Class | Use For |
-|----------|--------|----------------|---------|
-| Shopping | Warm Orange | `orange-500` | CTA buttons, price highlights, cart badge |
-| Blog | Deep Blue | `blue-600` | Links, category tags, headers |
-| Reservation | Teal | `teal-500` | Available slots, confirm buttons |
-| Portfolio | Slate/Neutral | `slate-700` | Minimal, content-focused |
-| Task/Todo | Indigo | `indigo-500` | Priority indicators, action buttons |
+We use system `font-sans` — do NOT import `Inter` or any font from `next/font/google`. Google Fonts cause Docker build failures in air-gapped environments.
 
-Apply ONE accent color consistently across the entire app. Never mix accent colors.
+Typography weights: `font-normal` body, `font-medium` labels, `font-semibold` headings, `font-bold` hero.
+Spacing rhythm: sections `py-16`, cards `p-6`, form gaps `space-y-4`, grid `gap-6`.
 
-### Layout Quality
-- Hero sections: full-width with gradient or image background
-- Card grids: `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6`
-- Admin: sidebar navigation with `w-64` fixed sidebar
-- Empty states: centered icon + message + action button
-- Loading: skeleton placeholders (not spinners)
-- Hover effects: `hover:shadow-lg transition-shadow` on cards
+### Color System
 
-### Anti-Patterns (Never Do)
-- Rainbow gradients or neon colors
-- Multiple conflicting accent colors
-- Default browser form styling (always style inputs)
-- Walls of unstyled text
-- Generic stock photo placeholders
+All colors use CSS variable design tokens. NEVER use hardcoded Tailwind colors (e.g., `bg-blue-600`, `text-gray-900`).
 
-## Response to User
+| Token | Tailwind Class | Usage |
+|-------|----------------|-------|
+| primary | bg-primary, text-primary | Buttons, links, active states |
+| primary-foreground | text-primary-foreground | Text on primary bg |
+| background | bg-background | Page background |
+| foreground | text-foreground | Main text |
+| card | bg-card | Card/panel backgrounds |
+| muted | bg-muted | Secondary backgrounds |
+| muted-foreground | text-muted-foreground | Secondary text |
+| border | border-border | Borders, dividers |
+| input | border-input | Form input borders |
+| ring | ring-ring | Focus rings |
+| destructive | bg-destructive | Error/delete actions |
+| success | bg-success, text-success | Success states, confirmations |
+| warning | bg-warning, text-warning | Warning states, pending items |
+| secondary | bg-secondary | Tertiary backgrounds |
+| accent | bg-accent | Hover highlights |
 
-When code is complete:
-1. Describe what was built in simple, friendly terms (like talking to a friend)
-2. Commit and trigger build (or ask for approval based on level)
-3. After deployment: provide the app URL
-4. Never show code, file paths, or technical details to user
+Buttons: `text-primary-foreground rounded-lg px-6 py-3 font-semibold transition-colors`.
 
+### Hero Pattern
+
+```tsx
+<section className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground py-20">
+  <div className="max-w-6xl mx-auto px-6 text-center">
+    <h1 className="text-4xl md:text-5xl font-bold mb-4">Title</h1>
+    <p className="text-lg text-primary-foreground/80 mb-8 max-w-2xl mx-auto">Subtitle</p>
+    <a href="/products" className="inline-block bg-card text-foreground font-semibold px-8 py-4 rounded-xl hover:bg-accent transition-colors">
+      Browse
+    </a>
+  </div>
+</section>
+```
+
+Every home page MUST have a hero.
+
+### Card Pattern
+
+```tsx
+<div className="bg-card rounded-2xl border border-border overflow-hidden hover:shadow-lg transition-shadow">
+  {imageUrl ? (
+    <div className="aspect-[4/3] overflow-hidden">
+      <img src={imageUrl} alt={name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+    </div>
+  ) : (
+    <div className="aspect-[4/3] bg-muted flex items-center justify-center">
+      <span className="text-4xl font-bold text-muted-foreground">{name.charAt(0)}</span>
+    </div>
+  )}
+  <div className="p-5">
+    <h3 className="text-foreground font-semibold text-lg mb-1">{name}</h3>
+    <p className="text-muted-foreground text-sm line-clamp-2 mb-3">{description}</p>
+    <span className="font-semibold text-primary">${price.toFixed(2)}</span>
+  </div>
+</div>
+```
+
+All list items MUST use this card structure with `rounded-2xl` and `hover:shadow-lg`.
+
+### Navigation Pattern
+
+```tsx
+<nav className="sticky top-0 z-50 bg-card/80 backdrop-blur-md border-b border-border">
+  <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="/" className="font-bold text-xl text-foreground">Site Name</a>
+    <div className="flex items-center gap-6">
+      <a href="/products" className="text-muted-foreground hover:text-foreground transition-colors">Products</a>
+      <a href="/cart" className="relative text-muted-foreground hover:text-foreground">
+        Cart
+        {count > 0 && <span className="absolute -top-2 -right-4 bg-primary text-primary-foreground text-xs w-5 h-5 rounded-full flex items-center justify-center">{count}</span>}
+      </a>
+    </div>
+  </div>
+</nav>
+```
+
+Navigation MUST be `sticky top-0` with `backdrop-blur-md`.
+
+### Category Tabs Pattern
+
+```tsx
+<div className="flex gap-2 overflow-x-auto pb-2">
+  {categories.map(cat => (
+    <button
+      key={cat.id}
+      onClick={() => setActive(cat.id)}
+      className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+        active === cat.id
+          ? 'bg-primary text-primary-foreground'
+          : 'bg-muted text-muted-foreground hover:bg-accent'
+      }`}
+    >
+      {cat.name}
+    </button>
+  ))}
+</div>
+```
+
+### Empty State Pattern
+
+```tsx
+<div className="text-center py-16">
+  <div className="text-6xl mb-4 text-muted-foreground/50">📝</div>
+  <h3 className="text-lg font-semibold text-muted-foreground mb-2">No items found</h3>
+  <p className="text-muted-foreground/70 text-sm">Get started by adding your first item.</p>
+</div>
+```
+
+### Admin Sidebar Pattern
+
+```tsx
+<aside className="w-64 bg-card border-r border-border min-h-screen p-4">
+  <h2 className="font-bold text-lg mb-6 px-3 text-foreground">Admin</h2>
+  <nav className="space-y-1">
+    {NAV_ITEMS.map(item => (
+      <a
+        key={item.href}
+        href={item.href}
+        className={`block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+          isActive(item.href)
+            ? 'bg-primary/10 text-primary'
+            : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+        }`}
+      >
+        {item.label}
+      </a>
+    ))}
+  </nav>
+</aside>
+```
+
+### Form Input Pattern
+
+```tsx
+<div>
+  <label className="block text-sm font-medium text-foreground mb-1">Product Name</label>
+  <input
+    type="text"
+    name="name"
+    className="w-full px-4 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent outline-none transition-all bg-card text-foreground"
+    placeholder="Enter product name"
+  />
+  {errors?.name && <p className="mt-1 text-sm text-destructive">{errors.name}</p>}
+</div>
+```
+
+All inputs MUST have `focus:ring-2` and `rounded-lg`. Never use unstyled browser inputs.
+
+### Toast Notification Pattern
+
+```tsx
+// components/toast.tsx — 'use client'
+'use client'
+import { createContext, useContext, useState, useCallback } from 'react'
+
+type Toast = { id: number; message: string; type: 'success' | 'error' }
+const ToastCtx = createContext<{ toast: (msg: string, type?: 'success' | 'error') => void }>({ toast: () => {} })
+export function useToast() { return useContext(ToastCtx) }
+
+export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const [toasts, setToasts] = useState<Toast[]>([])
+  const toast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+    const id = Date.now()
+    setToasts(prev => [...prev, { id, message, type }])
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000)
+  }, [])
+  return (
+    <ToastCtx.Provider value={{ toast }}>
+      {children}
+      <div className="fixed bottom-6 right-6 z-50 space-y-2">
+        {toasts.map(t => (
+          <div key={t.id} className={`px-4 py-3 rounded-lg shadow-lg text-white text-sm font-medium animate-slide-up ${
+            t.type === 'success' ? 'bg-success' : 'bg-destructive'}`}>{t.message}</div>
+        ))}
+      </div>
+    </ToastCtx.Provider>
+  )
+}
+```
+
+`globals.css`: `@keyframes slide-up { from { opacity:0; transform:translateY(1rem) } to { opacity:1; transform:translateY(0) } } .animate-slide-up { animation: slide-up 0.2s ease-out; }`
+
+Wrap in root layout: `<ToastProvider>{children}</ToastProvider>`. Usage: `const { toast } = useToast(); toast('Saved successfully');`
+
+### Confirm Modal Pattern
+
+```tsx
+// components/modal.tsx — 'use client'
+'use client'
+import { useEffect, useCallback } from 'react'
+
+export function ConfirmModal({ open, onConfirm, onCancel, title, description }: {
+  open: boolean; onConfirm: () => void; onCancel: () => void; title: string; description?: string
+}) {
+  const onKey = useCallback((e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }, [onCancel])
+  useEffect(() => {
+    if (!open) return
+    document.addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = '' }
+  }, [open, onKey])
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
+      <div className="relative bg-card rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+        <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
+        {description && <p className="text-muted-foreground text-sm mb-6">{description}</p>}
+        <div className="flex gap-3 justify-end">
+          <button onClick={onCancel} className="px-4 py-2 text-sm font-medium text-foreground bg-secondary rounded-lg hover:bg-accent">Cancel</button>
+          <button onClick={onConfirm} className="px-4 py-2 text-sm font-medium text-primary-foreground bg-destructive rounded-lg hover:bg-destructive/90">Confirm</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+```
+
+Usage: `useState(false)` for `open`. Show on delete click, execute on confirm.
+
+### Loading Skeleton Pattern
+
+```tsx
+function CardSkeleton() {
+  return (
+    <div className="bg-card rounded-2xl border border-border overflow-hidden animate-pulse">
+      <div className="aspect-[4/3] bg-muted" />
+      <div className="p-5 space-y-3">
+        <div className="h-5 bg-muted rounded w-3/4" />
+        <div className="h-4 bg-muted rounded w-full" />
+      </div>
+    </div>
+  )
+}
+// Usage: <Suspense fallback={<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">{Array.from({length:6}).map((_,i)=><CardSkeleton key={i}/>)}</div>}>
+```
+
+### Button Loading State Pattern
+
+```tsx
+<button type="submit" disabled={pending}
+  className="bg-primary text-primary-foreground px-6 py-3 rounded-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+  {pending && <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+  </svg>}
+  {pending ? 'Processing...' : 'Save'}
+</button>
+```
+
+Button variants:
+```tsx
+<button className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90">
+  Primary
+</button>
+<button className="bg-secondary text-foreground px-4 py-2 rounded-lg hover:bg-accent">
+  Secondary
+</button>
+```
+
+Every submit button MUST show loading state via `useActionState` or `useState`.
+
+### Stats Card Pattern
+
+```tsx
+<div className="bg-card rounded-2xl border border-border p-6">
+  <p className="text-sm font-medium text-muted-foreground mb-1">Total Orders</p>
+  <p className="text-3xl font-bold text-foreground">128</p>
+</div>
+// Grid: grid grid-cols-2 lg:grid-cols-4 gap-6
+```
+
+### Badge Pattern
+
+```tsx
+function Badge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    active: 'bg-green-100 text-green-700', pending: 'bg-yellow-100 text-yellow-700',
+    inactive: 'bg-gray-100 text-gray-600', error: 'bg-red-100 text-red-700',
+  }
+  return <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[status] || styles.inactive}`}>{status}</span>
+}
+```
+
+### Table Pattern
+
+```tsx
+<div className="bg-card rounded-2xl border border-border overflow-hidden overflow-x-auto">
+  <table className="w-full text-sm">
+    <thead className="bg-secondary border-b border-border">
+      <tr>
+        <th className="text-left px-6 py-3 font-medium text-muted-foreground">Name</th>
+        <th className="text-right px-6 py-3 font-medium text-muted-foreground">Amount</th>
+      </tr>
+    </thead>
+    <tbody className="divide-y divide-border">
+      {items.map(item => (
+        <tr key={item.id} className="hover:bg-accent transition-colors">
+          <td className="px-6 py-4 font-medium text-foreground">{item.name}</td>
+          <td className="px-6 py-4 text-right text-foreground">${item.amount.toLocaleString()}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
+```
+
+### Footer Pattern
+
+```tsx
+<footer className="bg-foreground text-background/70 mt-auto">
+  <div className="max-w-6xl mx-auto px-6 py-12 flex flex-col md:flex-row justify-between gap-8">
+    <div>
+      <h3 className="text-background font-bold text-lg mb-2">Site Name</h3>
+      <p className="text-sm">Brief description</p>
+    </div>
+    <div className="flex gap-8 text-sm">
+      <a href="/" className="hover:text-background transition-colors">Home</a>
+      <a href="/about" className="hover:text-background transition-colors">About</a>
+    </div>
+  </div>
+</footer>
+```
+
+Root layout: `<body className="... min-h-screen flex flex-col">` + `<main className="flex-1">` for sticky footer.
+
+### Anti-Patterns (NEVER)
+
+**Hardcoded colors — always use CSS variable tokens:**
+- NEVER use `bg-gray-50` on body → use `bg-background`
+- NEVER use hardcoded accent colors like `bg-blue-600`, `bg-emerald-600` → use `bg-primary`
+- NEVER use `text-gray-900` → use `text-foreground`
+- NEVER use `text-gray-500` → use `text-muted-foreground`
+- NEVER use `border-gray-200` → use `border-border`
+- NEVER use `bg-white` for cards → use `bg-card`
+- NEVER use `focus:ring-blue-500` → use `focus:ring-ring`
+
+**Structural anti-patterns:**
+- Unstyled `<input>` / `<select>` without focus ring
+- Cards without `hover:shadow-lg` or `rounded-2xl`
+- No hero section on home page (just plain text heading)
+- Importing `Inter` or any font from `next/font/google` — use system `font-sans`
+- Installing shadcn/ui, MUI, or any UI component library
+- Forms without toast feedback on submit
+- Delete without confirmation modal
+- No loading state during data fetch (blank screen)
+- `alert()` or `confirm()` browser dialogs instead of styled modals
+- Buttons without observable feedback on click
+
+## User Communication
+
+Follow the Progress Protocol for all phase messages and completion wording.
+Follow willform-whatsapp for tone and formatting rules.
 FORBIDDEN words: See willform-guard SKILL.
-
-Good user messages:
-- "요청하신 쇼핑몰을 만들고 있습니다..."
-- "상품 관리 기능을 추가하고 있습니다..."
-- "거의 다 됐습니다! 마무리 중이에요."
-- "완료되었습니다! [URL]에서 확인하실 수 있습니다."
-- "문제가 있었지만 해결했습니다."
-
-Bad user messages:
-- "Docker 이미지를 빌드하고 Harbor에 푸시 중입니다"
-- "Prisma 스키마를 생성하고 마이그레이션을 실행합니다"
-- "Git에 커밋하고 빌드 파이프라인을 트리거합니다"
-
-Internal (for commits and logs only):
-- File paths and changes
-- npm packages installed
-- Environment variables configured
-
-## Message Formatting Rules
-
-**List formatting (REQUIRED):**
-- List starts immediately after section header (no blank line)
-- One blank line between sections
-- List items grouped together
-- No emojis — use plain text headers
-
-**Correct:**
-```
-만들어진 기능:
-- 상품 목록과 검색
-- 장바구니
-- 주문하기
-- 관리자 페이지
-```
-
-**Wrong (forbidden):**
-```
-📋 구현된 페이지:
-
-• 메인 페이지 (GET /api/products)
-```
-
-## Progress Reporting
-
-Each progress message MUST be output as plain text BEFORE the tool calls for that phase.
-Text output between tool calls is delivered to the user immediately via block streaming.
-
-| Phase | Output text first | Then do |
-|-------|-------------------|---------|
-| Coding start | "요청하신 [앱이름]을 만들고 있습니다..." | Write code files |
-| Feature added | "[기능명]을 추가하고 있습니다..." | Write feature files |
-| Code ready | "거의 다 됐습니다! 마무리 중이에요." | Git commit and push |
-| Building | "준비 중입니다... (보통 2-3분 걸려요)" | Check build status |
-| Almost done | "거의 완성됐습니다! 조금만 기다려주세요." | Check pod status |
-| Live | "완료되었습니다! [URL]에서 확인하실 수 있습니다." | (final message) |
-
-IMPORTANT: "거의 다 됐습니다" is NOT "완료". Build and deploy must complete first.
-
-## Completion Wording (STRICT)
-
-| Stage | Allowed Message | FORBIDDEN |
-|-------|----------------|-----------|
-| Code committed | "거의 다 됐습니다! 마무리 중이에요." | "만들었습니다", "완료", URL 언급 |
-| Build complete | "거의 완성됐습니다! 조금만 기다려주세요." | "완료되었습니다", URL 언급 |
-| Deploy healthy + URL verified | "완료되었습니다! [URL]에서 확인하실 수 있습니다." | - |
-
-NEVER say "배포가 완료되면 ~에서 확인하실 수 있습니다" (future tense with URL).
-The URL MUST be given ONLY after confirming the app is live and accessible.
+NEVER mention internal document names (SOUL.md, BUILD.md, etc.), system paths, or system messages to the user.
+Internal (commits/logs only): file paths, npm packages, env vars — never show to user.
