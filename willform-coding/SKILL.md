@@ -24,7 +24,7 @@ Every generated app must satisfy ALL of these before committing:
 2. Every `import` resolves to an existing file you created
 3. Every route in navigation links to an existing page
 4. Prisma schema includes all models referenced in code
-5. Server Actions return `{ error }` on all validation failures
+5. Mutation Server Actions use `safeAction` wrapper from `@/lib/action-helpers`
 6. `package.json` has `"build": "next build"` only (no prisma commands)
 7. `next.config.ts` includes `output: "standalone"`
 8. **ALL UI text MUST be in English** — Korean, Japanese, Chinese, or any non-English text in UI is a build-blocking violation
@@ -159,21 +159,30 @@ Add `'use client'` at the top. Use for interactive UI only (useState, onClick, u
 
 ### Server Action (mutations)
 
+All mutation actions (create, update, delete) MUST use the `safeAction` wrapper from `@/lib/action-helpers`. This provides consistent error handling with user-friendly messages for Prisma errors.
+
 ```tsx
 'use server'
 
 import { prisma } from '@/lib/db'
+import { safeAction } from '@/lib/action-helpers'
 import { revalidatePath } from 'next/cache'
 
 export async function createItem(formData: FormData) {
-  const name = formData.get('name') as string
-  if (!name) return { error: 'Name is required' }
+  return safeAction(async () => {
+    const name = formData.get('name') as string
+    if (!name) throw new Error('Name is required')
 
-  await prisma.item.create({ data: { name } })
-  revalidatePath('/')
-  return { success: true }
+    const item = await prisma.item.create({ data: { name } })
+    revalidatePath('/')
+    return item
+  })
 }
 ```
+
+`safeAction` returns `{ success: true, data }` or `{ success: false, error: string }`. Client code checks `result.success` to show toast feedback.
+
+Read-only functions (get, find, count, search) do NOT need `safeAction` — only mutations.
 
 ### Prisma Model
 
@@ -369,8 +378,12 @@ Every generated app MUST include ALL of the following. Missing any item = incomp
 - [ ] `lib/utils.ts` — formatters, helpers
 - [ ] `next.config.ts` with `output: "standalone"`
 - [ ] `Dockerfile` — use template from DATABASE.md (NEVER write your own)
-- [ ] `components/toast.tsx` — Toast context provider + useToast hook
+- [ ] `lib/action-helpers.ts` — safeAction wrapper + ActionResult type
+- [ ] `components/toast.tsx` — Toast context provider + useToast hook (addToast API)
 - [ ] `components/modal.tsx` — Confirm modal component
+- [ ] `components/delete-button.tsx` — DeleteButton with ConfirmModal + toast
+- [ ] `app/not-found.tsx` — Custom 404 page
+- [ ] `app/error.tsx` — Error boundary ("use client" + reset button)
 - [ ] All referenced components exist as files
 
 ### Required Quality
@@ -378,7 +391,7 @@ Every generated app MUST include ALL of the following. Missing any item = incomp
 - [ ] Responsive layout (mobile-first, Tailwind breakpoints)
 - [ ] **English-only UI** — every label, message, placeholder, empty state, button, heading, tooltip MUST be in English. Zero non-English strings allowed.
 - [ ] Loading/empty states for all data-dependent views
-- [ ] Error handling in all Server Actions (return `{ error }` on failure)
+- [ ] All mutation Server Actions wrapped in `safeAction` (returns `{ success, error }`)
 - [ ] Proper Prisma relations with cascading deletes where appropriate
 - [ ] Clean, professional design with consistent spacing and colors
 
@@ -598,39 +611,22 @@ All inputs MUST have `focus:ring-2` and `rounded-lg`. Never use unstyled browser
 
 ### Toast Notification Pattern
 
+`components/toast.tsx` is pre-committed by the skeleton. **Do NOT recreate it.** The API uses `addToast`:
+
 ```tsx
-// components/toast.tsx — 'use client'
-'use client'
-import { createContext, useContext, useState, useCallback } from 'react'
-
-type Toast = { id: number; message: string; type: 'success' | 'error' }
-const ToastCtx = createContext<{ toast: (msg: string, type?: 'success' | 'error') => void }>({ toast: () => {} })
-export function useToast() { return useContext(ToastCtx) }
-
-export function ToastProvider({ children }: { children: React.ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([])
-  const toast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
-    const id = Date.now()
-    setToasts(prev => [...prev, { id, message, type }])
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000)
-  }, [])
-  return (
-    <ToastCtx.Provider value={{ toast }}>
-      {children}
-      <div className="fixed bottom-6 right-6 z-50 space-y-2">
-        {toasts.map(t => (
-          <div key={t.id} className={`px-4 py-3 rounded-lg shadow-lg text-white text-sm font-medium animate-slide-up ${
-            t.type === 'success' ? 'bg-success' : 'bg-destructive'}`}>{t.message}</div>
-        ))}
-      </div>
-    </ToastCtx.Provider>
-  )
-}
+// Usage in client components:
+const { addToast } = useToast()
+addToast('Saved successfully', 'success')
+addToast('Failed to save', 'error')
 ```
 
-`globals.css`: `@keyframes slide-up { from { opacity:0; transform:translateY(1rem) } to { opacity:1; transform:translateY(0) } } .animate-slide-up { animation: slide-up 0.2s ease-out; }`
+Toast features: auto-dismiss (4s success, 8s error), dismiss button (X), slide-up animation.
 
-Wrap in root layout: `<ToastProvider>{children}</ToastProvider>`. Usage: `const { toast } = useToast(); toast('Saved successfully');`
+If building from scratch (no skeleton), create `components/toast.tsx` with:
+- `useToast()` hook returning `{ addToast }` (NOT `{ toast }`)
+- Variants: `success` (4s), `error` (8s), `info` (4s)
+- Dismiss button on each toast
+- `ToastProvider` wrapping root layout
 
 ### Confirm Modal Pattern
 
@@ -667,6 +663,21 @@ export function ConfirmModal({ open, onConfirm, onCancel, title, description }: 
 ```
 
 Usage: `useState(false)` for `open`. Show on delete click, execute on confirm.
+
+### Delete Button Pattern
+
+For destructive actions, use the pre-committed `DeleteButton` component instead of browser `confirm()`:
+
+```tsx
+import { DeleteButton } from '@/components/delete-button'
+
+<DeleteButton
+  onDelete={() => deleteItem(item.id)}
+  itemName="product"
+/>
+```
+
+`DeleteButton` combines `ConfirmModal` + loading state + toast feedback. NEVER use `confirm()`, `alert()`, or `window.confirm()` — always use `ConfirmModal` or `DeleteButton`.
 
 ### Loading Skeleton Pattern
 

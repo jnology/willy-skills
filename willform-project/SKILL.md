@@ -198,6 +198,10 @@ The skeleton catalog is available at `FORGEJO_URL/skeletons/catalog`. Each skele
 | `restaurant-menu` | Restaurants, cafes, takeout | MenuItem, Order, OrderItem |
 | `directory` | Business directories, resource lists | Listing |
 | `waitlist` | Product launches, pre-orders | WaitlistSignup |
+| `blog` | Blogs, news sites, content platforms | Category, Post, Comment |
+| `online-store` | E-commerce, shops, product sales | Category, Product, Order, OrderItem |
+| `knowledge-base` | FAQ sites, help centers, documentation | Category, Article |
+| `survey-form` | Surveys, feedback forms, questionnaires | FormField, Submission |
 
 ### How to Use Skeletons
 
@@ -218,6 +222,10 @@ Match user descriptions to skeleton types:
 - "restaurant", "menu", "food ordering" → `restaurant-menu`
 - "directory", "business listing", "resource list" → `directory`
 - "waitlist", "coming soon", "launch page" → `waitlist`
+- "blog", "news site", "articles", "content site" → `blog`
+- "online store", "shop", "e-commerce", "sell products" → `online-store`
+- "FAQ", "help center", "knowledge base", "documentation" → `knowledge-base`
+- "survey", "feedback form", "questionnaire", "form builder" → `survey-form`
 
 If no skeleton matches well, use the **Full App Replacement** process below to build from scratch.
 
@@ -227,14 +235,14 @@ If no skeleton matches well, use the **Full App Replacement** process below to b
 |------|-----|
 | Schema | Rename/add/remove models and fields in `prisma/schema.prisma` |
 | Pages | Adjust content, add/remove pages in `app/` |
-| Styling | Change accent color, adjust layout (keep Tailwind + Inter font) |
+| Styling | Change accent color, adjust layout (keep Tailwind + system font-sans) |
 | Actions | Modify CRUD operations in `lib/actions.ts` for new/renamed models |
 | Seed data | Update sample data to match the user's theme and business |
 | Navigation | Update nav links to match new page structure |
 
 ### When to Build from Scratch
 
-If the user's request is **fundamentally different** from any available skeleton (e.g., a survey builder, inventory tracker, or anything with unique data models and flows), use the Full App Replacement process below instead of modifying a skeleton.
+If the user's request is **fundamentally different** from any available skeleton (e.g., a real-time chat app, inventory tracker, or anything with unique data models and flows), use the Full App Replacement process below instead of modifying a skeleton.
 
 ## App Type Reference
 
@@ -674,7 +682,7 @@ Before committing, check:
 - Card consistency — all list items use Card Pattern with `rounded-2xl` and `hover:shadow-lg`?
 - Navigation quality — sticky nav with `backdrop-blur-md`?
 - Whitespace — sections separated by `py-16`, cards have `gap-6`?
-- Typography — `Inter` imported via `next/font/google`?
+- Typography — uses system `font-sans` (NOT Google Fonts)?
 - Color discipline — one accent color used consistently (see Color System table)?
 - Interactive feedback — all buttons have `hover:` state and `transition-colors`?
 - Toast feedback — every form submit and delete action shows toast notification?
@@ -814,7 +822,7 @@ When a user asks to add a feature to an existing app:
 ## Design Principles
 
 Follow the Visual Design System defined in willform-coding skill.
-Key rules: ONE accent color per app, `bg-gray-50` body, Inter font, responsive grid layout.
+Key rules: ONE accent color per app, CSS variable tokens, system font-sans, responsive grid layout.
 English UI throughout: dates (January 15, 2024), currency ($12.00), all labels/messages in English.
 
 ## User Communication
